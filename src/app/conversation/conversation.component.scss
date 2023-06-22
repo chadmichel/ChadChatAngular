@@ -1,0 +1,89 @@
+// .chat-container {
+//     min-height: 100%;
+//     height: 100%;
+//     display: flex;
+//     flex-direction: column;
+//     align-items: stretch;
+//     justify-content: stretch    ;
+//     flex-grow: 1;
+// }
+
+// .chat-messages {
+//     flex-grow: 1;
+//     overflow-y: auto;
+//     background-color: pink;
+// }
+
+// .chat-input {
+//     width: 100%;
+//     flex-grow: 0;
+//     flex-direction: row;
+//     justify-content: center;
+    
+//     background-color: blue;;
+// }
+
+// .message-input {
+//     align-self: center;
+//     width: 80%;
+//     font-size: 11px;
+// }
+
+:host {
+    height: 100vh;
+    background-color: yellow;
+    background-color: orange;
+    display: flex;
+    flex-direction: column;
+    justify-content: stretch;
+    align-items: stretch;    
+}
+
+// .chat-container {
+//     min-height: 100%;
+//     background-color: orange;
+//     display: flex;
+//     flex-direction: column;
+//     justify-content: stretch;
+//     align-items: stretch;
+// }
+
+// .chat-messages {
+//     background-color: pink;
+//     flex-grow: 1;
+//     overflow-x: hidden;
+//     overflow-y: auto;
+// }
+
+// .chat-input {
+//     background-color: blue;
+//     height: 60px;
+//     flex-shrink: 0;    
+// }
+
+
+.chat-messages {    
+    background-color: pink;
+    overflow-y: auto;
+}
+
+
+.chat-input {
+    background-color: blue;
+    height: 80px;
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: stretch;
+    align-items: center;
+}
+
+.message-input {
+    margin-left: 30px;
+    margin-top: 10px;
+    align-self: center;
+    width: 90%;
+    font-size: 11px;
+}
