@@ -53,12 +53,14 @@ import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { HttpClientModule } from '@angular/common/http';
 import { LayoutModule } from '@angular/cdk/layout';
+import { LoginComponent } from './login/login.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     ConversationComponent,
     ConversationListComponent,
+    LoginComponent,
   ],
   imports: [
     BrowserModule,

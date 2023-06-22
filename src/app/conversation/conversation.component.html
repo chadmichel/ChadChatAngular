@@ -30,10 +30,10 @@
     *ngFor="let message of messages"
     [ngClass]="{ received: message.isReceived }"
   >
-    <div class="chat-message-theirs">
+    <div *ngIf="!message.isMine" class="chat-message-theirs">
       <p>{{ message.text }}</p>
     </div>
-    <div class="chat-message-mine">
+    <div *ngIf="message.isMine" class="chat-message-mine">
       <p>{{ message.text }}</p>
     </div>
   </div>
