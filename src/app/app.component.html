@@ -1,7 +1,15 @@
 <div class="app">
   <div class="header">
     <mat-toolbar class="header-toolbar" color="primary">
-      <span>{{ pageTitle }}</span>
+      <span class="page-title">{{ pageTitle }}</span>
+
+      <button
+        class="new-conversation-button"
+        mat-icon-button
+        (click)="newConversation()"
+      >
+        <mat-icon>add</mat-icon>
+      </button>
     </mat-toolbar>
   </div>
   <div class="main">

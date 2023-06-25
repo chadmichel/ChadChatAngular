@@ -1,1 +1,10 @@
-<p>conversation-list works!</p>
+<div *ngIf="!isLoaded">
+  <mat-spinner></mat-spinner>
+</div>
+<div *ngIf="isLoaded">
+  <mat-list>
+    <mat-list-item *ngFor="let chat of chats | async" (click)="openChat(chat)">
+      <div class="chat-item" matLine>{{ chat.topic }}</div>
+    </mat-list-item>
+  </mat-list>
+</div>

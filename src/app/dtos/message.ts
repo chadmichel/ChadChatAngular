@@ -1,6 +1,8 @@
 export interface Message {
-  id: number;
+  id: string;
   text: string;
-  isReceived: boolean;
   isMine: boolean;
+  senderDisplayName: string;
+  createdOn: Date;
+  sequenceId: string;
 }

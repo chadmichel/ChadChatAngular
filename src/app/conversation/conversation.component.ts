@@ -1,5 +1,7 @@
 import { Component } from '@angular/core';
 import { Title } from '@angular/platform-browser';
+import { ChatService } from '../chat.service';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-conversation',
@@ -41,8 +43,24 @@ export class ConversationComponent {
     },
   ];
 
-  constructor(private title: Title) {
+  constructor(
+    private title: Title,
+    private chatService: ChatService,
+    private router: Router,
+    private activeRoute: ActivatedRoute
+  ) {
     this.title.setTitle('Conversation');
+  }
+
+  async ngOnInit() {
+    if (!this.chatService.isReady()) {
+      this.router.navigate(['/login']);
+    }
+
+    this.activeRoute.params.subscribe(async (params) => {
+      var messages = await this.chatService.getMessages(params['id']);
+      this.messages = messages;
+    });
   }
 
   sendMessage() {

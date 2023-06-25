@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { ChatService } from '../chat.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-login',
@@ -9,9 +10,10 @@ import { ChatService } from '../chat.service';
 export class LoginComponent {
   email: string = '';
 
-  constructor(private chatService: ChatService) {}
+  constructor(private chatService: ChatService, private router: Router) {}
 
   async login() {
     await this.chatService.init(this.email);
+    this.router.navigate(['/chats']);
   }
 }

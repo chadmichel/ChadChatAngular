@@ -1,0 +1,21 @@
+
+.header-toolbar {
+    display: flex;
+    flex-direction: row;    
+}
+
+.page-title {
+    flex: 1;
+}
+
+.new-conversation-button {
+    flex: 0;
+    width: 10px;
+    
+}
+
+.chat-item {
+    &:hover {
+        cursor: hand;
+    }
+}
