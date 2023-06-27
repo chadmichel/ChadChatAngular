@@ -10,6 +10,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 })
 export class ConversationComponent {
   newMessage: string = '';
+  id: string = '';
   messages: any[] = [
     {
       id: 1,
@@ -58,12 +59,18 @@ export class ConversationComponent {
     }
 
     this.activeRoute.params.subscribe(async (params) => {
-      var messages = await this.chatService.getMessages(params['id']);
+      this.id = params['id'];
+      var messages = await this.chatService.getMessages(this.id);
       this.messages = messages;
     });
   }
 
-  sendMessage() {
-    alert(this.newMessage);
+  async sendMessage() {
+    if (this.newMessage.length > 0) {
+      this.chatService.sendMessage(this.id, this.newMessage);
+      this.newMessage = '';
+      var messages = await this.chatService.getMessages(this.id);
+      this.messages = messages;
+    }
   }
 }

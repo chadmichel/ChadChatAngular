@@ -10,19 +10,22 @@
 .chat-messages {    
     overflow-y: auto;
     margin-bottom: 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .chat-message-mine {
     margin: 10px;
-    margin-left: 30%;
+    margin-left: 60%;
     background-color:lightgray;
     border-radius: 2%;
     padding: 10px;
 }
 .chat-message-theirs {
     margin: 10px;
-    margin-right: 30%;
-    background-color: lightgreen;
+    margin-right: 60%;
+    background-color:lightgreen;
     border-radius: 2%;
     padding: 10px;
 }

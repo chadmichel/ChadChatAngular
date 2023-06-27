@@ -20,14 +20,15 @@ export class ConversationListComponent {
     private router: Router
   ) {
     this.title.setTitle('Conversation List');
-    if (!this.chatService.isReady()) {
-      this.router.navigate(['/login']);
-    }
   }
 
   ngOnInit() {
     this.chats = this.chatService.getChats();
     this.chats.subscribe(() => (this.isLoaded = true));
+    if (!this.chatService.isReady()) {
+      console.log('Not logged in - redirecting to login');
+      this.router.navigate(['/login']);
+    }
   }
 
   openChat(chat: ChatThread) {

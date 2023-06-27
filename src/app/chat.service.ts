@@ -15,6 +15,7 @@ export class ChatService {
   email: string = '';
   userId: string = '';
   chatClient: ChatClient | undefined;
+  tokenExpiresOn: Date | undefined;
 
   constructor(private http: HttpClient) {
     this.loadFromLocalStorage();
@@ -35,14 +36,14 @@ export class ChatService {
 
   async init(email: string) {
     var initResponse = (await firstValueFrom(
-      this.http.post(`${this.getServiceUrl()}/api/Init`, { email: email })
+      this.httpPost('Init', { email: email })
     )) as any;
     console.log(initResponse);
     this.token = initResponse.token;
     this.chatEndpoint = initResponse.endpoint;
     this.email = initResponse.email;
     this.userId = initResponse.userId;
-
+    this.tokenExpiresOn = new Date(initResponse.expiresOn);
     this.createClient();
 
     this.saveToLocalStorage();
@@ -66,18 +67,34 @@ export class ChatService {
     if (messages) {
       for await (const message of messages) {
         console.log(message.id + ' ' + message.content);
+        if (
+          message.content?.message === undefined ||
+          message.content === undefined
+        ) {
+          continue;
+        }
         response.push({
           id: message.id,
           text: message.content?.message as string,
           senderDisplayName: message.senderDisplayName as string,
           createdOn: message.createdOn,
-          isMine: true,
+          isMine: (message.sender as any).communicationUserId === this.userId,
           sequenceId: message.sequenceId,
         });
       }
     }
 
     return response;
+  }
+
+  async sendMessage(chatId: string, message: string) {
+    const chatThread = this.chatClient?.getChatThreadClient(chatId);
+    if (chatThread) {
+      const sendResult = await chatThread.sendMessage({
+        content: message,
+      });
+      console.log(sendResult.id);
+    }
   }
 
   async createConversation(email: string) {
@@ -93,7 +110,21 @@ export class ChatService {
   }
 
   isReady() {
-    return this.chatClient !== undefined;
+    console.log('isReady ' + this.tokenExpiresOn);
+    console.log('chatClient ' + this.chatClient);
+    if (this.tokenExpiresOn! < new Date()) {
+      console.log('token expired');
+    }
+    if (this.tokenExpiresOn! >= new Date()) {
+      console.log('token not expired');
+    }
+    return (
+      this.chatClient != undefined &&
+      this.token != '' &&
+      this.token != undefined &&
+      this.tokenExpiresOn != undefined &&
+      this.tokenExpiresOn! > new Date()
+    );
   }
 
   saveToLocalStorage() {
@@ -104,6 +135,7 @@ export class ChatService {
         chatEndpoint: this.chatEndpoint,
         email: this.email,
         userId: this.userId,
+        tokenExpiresOn: this.tokenExpiresOn,
       })
     );
   }
@@ -114,6 +146,7 @@ export class ChatService {
     this.chatEndpoint = data.chatEndpoint;
     this.email = data.email;
     this.userId = data.userId;
+    this.tokenExpiresOn = new Date(data.tokenExpiresOn);
   }
 
   private requestOptions() {
