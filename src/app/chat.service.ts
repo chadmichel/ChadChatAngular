@@ -19,7 +19,6 @@ export class ChatService {
 
   chatClient: ChatClient | undefined;
 
-  chats: ChatThread[] = [];
   chats$: BehaviorSubject<ChatThread[]> = new BehaviorSubject<ChatThread[]>([]);
 
   chatDetail$: BehaviorSubject<ChatThreadDetail> =
@@ -51,10 +50,6 @@ export class ChatService {
 
     this.httpGet<ChatThread[]>('GetChats').subscribe((chats) => {
       console.log('chats: ' + chats.length);
-      this.chats = chats;
-      for (var chat of chats) {
-        console.log('chat: ' + chat.threadId);
-      }
       this.chats$.next(chats);
     });
 
