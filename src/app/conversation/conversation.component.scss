@@ -9,25 +9,29 @@
 
 .chat-messages {    
     overflow-y: auto;
+    overflow-x: hidden;
     margin-bottom: 150px;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
 }
 
 .chat-message-mine {
-    margin: 10px;
-    margin-left: 60%;
-    background-color:lightgray;
+    background-color:#FCE7E5;
+    align-self: flex-end;
+    max-width: 60%;
     border-radius: 2%;
-    padding: 10px;
+    margin: 10px;    
+    word-wrap:break-word;
 }
 .chat-message-theirs {
     margin: 10px;
     margin-right: 60%;
-    background-color:lightgreen;
+    max-width: 60%;
+    background-color:#F3F2F1;
     border-radius: 2%;
     padding: 10px;
+    word-wrap:break-word;
 }
 
 .chat-input {

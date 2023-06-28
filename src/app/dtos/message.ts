@@ -4,5 +4,5 @@ export interface Message {
   isMine: boolean;
   senderDisplayName: string;
   createdOn: Date;
-  sequenceId: string;
+  sequenceId: number;
 }

@@ -25,6 +25,12 @@ export class AppComponent {
     });
   }
 
+  async ngOnInit() {
+    if (!this.chatService.reInit()) {
+      this.router.navigate(['login']);
+    }
+  }
+
   newConversation(): void {
     const dialogRef = this.dialog.open(EmailDialogComponent, {
       width: '250px',
@@ -36,5 +42,13 @@ export class AppComponent {
         await this.chatService.createConversation(result);
       }
     });
+  }
+
+  gotoHome(): void {
+    this.router.navigate(['chats']);
+  }
+
+  gotoLogin(): void {
+    this.router.navigate(['login']);
   }
 }

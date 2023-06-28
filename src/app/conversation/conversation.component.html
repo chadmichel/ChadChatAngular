@@ -26,17 +26,25 @@
 </div> -->
 
 <div class="chat-messages">
-  <div
+  <mat-card
     *ngFor="let message of messages"
-    [ngClass]="{ received: message.isReceived }"
+    [ngClass]="{
+      'chat-message-mine': message.mine,
+      'chat-message-theirs': !message.mine
+    }"
   >
-    <div *ngIf="!message.isMine" class="chat-message-theirs">
+    <mat-card-content>
       <p>{{ message.text }}</p>
-    </div>
-    <div *ngIf="message.isMine" class="chat-message-mine">
-      <p>{{ message.text }}</p>
-    </div>
-  </div>
+      <mat-divider></mat-divider>
+      <p *ngIf="message.mine">
+        {{ message.createdOn | date : "M/d h:mm" }}
+      </p>
+      <p *ngIf="!message.mine">
+        {{ message.senderDisplayName }}
+        {{ message.createdOn | date : "M/d h:mm" }}
+      </p>
+    </mat-card-content>
+  </mat-card>
 </div>
 <div class="chat-input">
   <mat-form-field class="message-input">

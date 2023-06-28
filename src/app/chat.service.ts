@@ -2,9 +2,10 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { ChatClient, ChatMessage } from '@azure/communication-chat';
 import { AzureCommunicationTokenCredential } from '@azure/communication-common';
-import { Observable, firstValueFrom } from 'rxjs';
+import { BehaviorSubject, Observable, firstValueFrom, of } from 'rxjs';
 import { ChatThread } from './dtos/chat-thread';
 import { Message } from './dtos/message';
+import { ChatThreadDetail } from './dtos/chat-thread-detail';
 
 @Injectable({
   providedIn: 'root',
@@ -16,6 +17,9 @@ export class ChatService {
   userId: string = '';
   chatClient: ChatClient | undefined;
   tokenExpiresOn: Date | undefined;
+
+  chats: ChatThread[] = [];
+  chats$: BehaviorSubject<ChatThread[]> = new BehaviorSubject<ChatThread[]>([]);
 
   constructor(private http: HttpClient) {
     this.loadFromLocalStorage();
@@ -31,6 +35,15 @@ export class ChatService {
     this.chatClient.startRealtimeNotifications();
     this.chatClient.on('chatMessageReceived', (e) => {
       console.log('notification: ' + e);
+    });
+
+    this.httpGet<ChatThread[]>('GetChats').subscribe((chats) => {
+      console.log('chats: ' + chats.length);
+      this.chats = chats;
+      for (var chat of chats) {
+        console.log('chat: ' + chat.threadId);
+      }
+      this.chats$.next(chats);
     });
   }
 
@@ -49,20 +62,42 @@ export class ChatService {
     this.saveToLocalStorage();
   }
 
+  async reInit() {
+    if (this.tokenExpiresOn && this.tokenExpiresOn > new Date()) {
+      this.createClient();
+      return true;
+    }
+    return false;
+  }
+
   getChats(): Observable<ChatThread[]> {
-    return this.httpGet<ChatThread[]>('GetChats');
+    return this.chats$;
   }
 
-  getChat(chatId: string): Observable<ChatThread> {
-    return this.httpGet<ChatThread>(`GetChat?chatId=${chatId}`);
-  }
-
-  async getMessages(chatId: string): Promise<Message[]> {
+  async getChat(chatId: string): Promise<ChatThreadDetail> {
     const messages = this.chatClient
       ?.getChatThreadClient(chatId)
       .listMessages();
 
-    var response: Message[] | PromiseLike<Message[]> = [];
+    console.log('chats: ' + this.chats.length);
+    var chat = this.chats.filter((c) => c.threadId == chatId)[0];
+
+    if (chat == undefined) {
+      console.log('chat not found');
+
+      for (var c of this.chats) {
+        console.log('chat: ' + c.threadId);
+        if (c.threadId == chatId) {
+          chat = c;
+          console.log('found chat!!!');
+          break;
+        }
+      }
+
+      throw new Error('chat not found');
+    }
+
+    var messagesParsed: Message[] | PromiseLike<Message[]> = [];
 
     if (messages) {
       for await (const message of messages) {
@@ -73,18 +108,34 @@ export class ChatService {
         ) {
           continue;
         }
-        response.push({
+        messagesParsed.push({
           id: message.id,
           text: message.content?.message as string,
           senderDisplayName: message.senderDisplayName as string,
           createdOn: message.createdOn,
           isMine: (message.sender as any).communicationUserId === this.userId,
-          sequenceId: message.sequenceId,
+          sequenceId: parseInt(message.sequenceId),
         });
+
+        messagesParsed.sort(
+          (a, b) =>
+            a.createdOn.getUTCMilliseconds() - b.createdOn.getUTCMilliseconds()
+        );
       }
     }
 
-    return response;
+    const theirDisplayName = chat.members.filter(
+      (m) => m.userId !== this.userId
+    )[0].email;
+
+    return {
+      threadId: chatId,
+      topic: 'Chat with ' + theirDisplayName,
+      members: [],
+      lastMessageTime: new Date(),
+      theirDisplayName: theirDisplayName,
+      messages: messagesParsed,
+    };
   }
 
   async sendMessage(chatId: string, message: string) {

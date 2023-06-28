@@ -2,12 +2,14 @@
   <div class="header">
     <mat-toolbar class="header-toolbar" color="primary">
       <span class="page-title">{{ pageTitle }}</span>
+      <button mat-icon-button (click)="gotoHome()">
+        <mat-icon>home</mat-icon>
+      </button>
+      <button mat-icon-button (click)="gotoLogin()">
+        <mat-icon>login</mat-icon>
+      </button>
 
-      <button
-        class="new-conversation-button"
-        mat-icon-button
-        (click)="newConversation()"
-      >
+      <button mat-icon-button (click)="newConversation()">
         <mat-icon>add</mat-icon>
       </button>
     </mat-toolbar>

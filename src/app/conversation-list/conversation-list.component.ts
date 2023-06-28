@@ -11,7 +11,8 @@ import { ChatThread } from '../dtos/chat-thread';
   styleUrls: ['./conversation-list.component.scss'],
 })
 export class ConversationListComponent {
-  chats: Observable<ChatThread[]> = of([]);
+  chats$: Observable<ChatThread[]> = of([]);
+  chats: ChatThread[] = [];
   isLoaded: boolean = false;
 
   constructor(
@@ -23,12 +24,14 @@ export class ConversationListComponent {
   }
 
   ngOnInit() {
-    this.chats = this.chatService.getChats();
-    this.chats.subscribe(() => (this.isLoaded = true));
-    if (!this.chatService.isReady()) {
-      console.log('Not logged in - redirecting to login');
-      this.router.navigate(['/login']);
-    }
+    this.chats$ = this.chatService.getChats();
+    this.chats$.subscribe((chats) => {
+      console.log('loaded');
+      console.log(chats.length);
+      this.chats = chats;
+      this.isLoaded = true;
+      this.title.setTitle('Conversation List (' + chats.length + ')');
+    });
   }
 
   openChat(chat: ChatThread) {
