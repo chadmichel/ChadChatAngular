@@ -22,16 +22,15 @@ export class ChatService {
   chats: ChatThread[] = [];
   chats$: BehaviorSubject<ChatThread[]> = new BehaviorSubject<ChatThread[]>([]);
 
-  chatDetail: ChatThreadDetail = {
-    threadId: '',
-    topic: '',
-    members: [],
-    lastMessageTime: new Date(),
-    theirDisplayName: '',
-    messages: [],
-  };
   chatDetail$: BehaviorSubject<ChatThreadDetail> =
-    new BehaviorSubject<ChatThreadDetail>(this.chatDetail);
+    new BehaviorSubject<ChatThreadDetail>({
+      threadId: '',
+      topic: '',
+      members: [],
+      lastMessageTime: new Date(),
+      theirDisplayName: '',
+      messages: [],
+    });
 
   constructor(private http: HttpClient) {
     this.loadFromLocalStorage();
@@ -101,35 +100,38 @@ export class ChatService {
   }
 
   getChat(chatId: string): BehaviorSubject<ChatThreadDetail> {
-    if (this.chatDetail.threadId == chatId) {
+    if (this.chatDetail$.value.threadId == chatId) {
       return this.chatDetail$;
     }
 
-    this.chatDetail = {
+    // clear the chat detail
+    const chatDetail = {
       threadId: chatId,
       topic: '',
       members: [],
       lastMessageTime: new Date(),
       theirDisplayName: '',
       messages: [],
-    };
-    this.chatDetail$.next(this.chatDetail);
+    } as ChatThreadDetail;
+    this.chatDetail$.next(chatDetail);
 
+    // populate the chat detail using cached list of chats
     this.chats$.subscribe((chats) => {
       var chat = chats.find((c) => c.threadId == chatId);
-      if (chat && this.chatDetail.threadId == chat.threadId) {
-        this.chatDetail.topic = chat.topic;
-        this.chatDetail.members = chat.members;
-        this.chatDetail.lastMessageTime = chat.lastMessageTime;
+      if (chat && chatDetail.threadId == chat.threadId) {
+        chatDetail.topic = chat.topic;
+        chatDetail.members = chat.members;
+        chatDetail.lastMessageTime = chat.lastMessageTime;
         if (chat.createdByUserId == this.userId) {
-          this.chatDetail.theirDisplayName = chat.invitedUserEmail;
+          chatDetail.theirDisplayName = chat.invitedUserEmail;
         } else {
-          this.chatDetail.theirDisplayName = chat.createdByEmail;
+          chatDetail.theirDisplayName = chat.createdByEmail;
         }
       }
-      this.chatDetail$.next(this.chatDetail);
+      this.chatDetail$.next(chatDetail);
     });
 
+    // async load the messages
     setTimeout(async () => {
       const messages = this.chatClient
         ?.getChatThreadClient(chatId)
@@ -149,7 +151,7 @@ export class ChatService {
           messagesParsed.push({
             id: message.id,
             text: message.content?.message as string,
-            senderDisplayName: this.chatDetail.theirDisplayName,
+            senderDisplayName: chatDetail.theirDisplayName,
             createdOn: message.createdOn,
             isMine: (message.sender as any).communicationUserId === this.userId,
             sequenceId: parseInt(message.sequenceId),
@@ -160,9 +162,9 @@ export class ChatService {
           );
         }
       }
-      if (this.chatDetail.threadId == chatId) {
-        this.chatDetail.messages = messagesParsed;
-        this.chatDetail$.next(this.chatDetail);
+      if (chatDetail.threadId == chatId) {
+        chatDetail.messages = messagesParsed;
+        this.chatDetail$.next(chatDetail);
       }
     }, 1);
 
