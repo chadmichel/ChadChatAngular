@@ -15,15 +15,28 @@ export class ChatService {
   chatEndpoint: string = '';
   email: string = '';
   userId: string = '';
-  chatClient: ChatClient | undefined;
   tokenExpiresOn: Date | undefined;
+
+  chatClient: ChatClient | undefined;
 
   chats: ChatThread[] = [];
   chats$: BehaviorSubject<ChatThread[]> = new BehaviorSubject<ChatThread[]>([]);
 
+  chatDetail: ChatThreadDetail = {
+    threadId: '',
+    topic: '',
+    members: [],
+    lastMessageTime: new Date(),
+    theirDisplayName: '',
+    messages: [],
+  };
+  chatDetail$: BehaviorSubject<ChatThreadDetail> =
+    new BehaviorSubject<ChatThreadDetail>(this.chatDetail);
+
   constructor(private http: HttpClient) {
     this.loadFromLocalStorage();
-    if (this.token && this.token !== '') {
+
+    if (this.tokenExpiresOn && this.tokenExpiresOn > new Date()) {
       this.createClient();
     }
   }
@@ -47,7 +60,7 @@ export class ChatService {
     });
   }
 
-  async init(email: string) {
+  async login(email: string) {
     var initResponse = (await firstValueFrom(
       this.httpPost('Init', { email: email })
     )) as any;
@@ -57,85 +70,83 @@ export class ChatService {
     this.email = initResponse.email;
     this.userId = initResponse.userId;
     this.tokenExpiresOn = new Date(initResponse.expiresOn);
+
     this.createClient();
 
     this.saveToLocalStorage();
-  }
-
-  async reInit() {
-    if (this.tokenExpiresOn && this.tokenExpiresOn > new Date()) {
-      this.createClient();
-      return true;
-    }
-    return false;
   }
 
   getChats(): Observable<ChatThread[]> {
     return this.chats$;
   }
 
-  async getChat(chatId: string): Promise<ChatThreadDetail> {
-    const messages = this.chatClient
-      ?.getChatThreadClient(chatId)
-      .listMessages();
-
-    console.log('chats: ' + this.chats.length);
-    var chat = this.chats.filter((c) => c.threadId == chatId)[0];
-
-    if (chat == undefined) {
-      console.log('chat not found');
-
-      for (var c of this.chats) {
-        console.log('chat: ' + c.threadId);
-        if (c.threadId == chatId) {
-          chat = c;
-          console.log('found chat!!!');
-          break;
-        }
-      }
-
-      throw new Error('chat not found');
+  getChat(chatId: string): BehaviorSubject<ChatThreadDetail> {
+    if (this.chatDetail.threadId == chatId) {
+      return this.chatDetail$;
     }
 
-    var messagesParsed: Message[] | PromiseLike<Message[]> = [];
-
-    if (messages) {
-      for await (const message of messages) {
-        console.log(message.id + ' ' + message.content);
-        if (
-          message.content?.message === undefined ||
-          message.content === undefined
-        ) {
-          continue;
-        }
-        messagesParsed.push({
-          id: message.id,
-          text: message.content?.message as string,
-          senderDisplayName: message.senderDisplayName as string,
-          createdOn: message.createdOn,
-          isMine: (message.sender as any).communicationUserId === this.userId,
-          sequenceId: parseInt(message.sequenceId),
-        });
-
-        messagesParsed.sort(
-          (a, b) =>
-            a.createdOn.getUTCMilliseconds() - b.createdOn.getUTCMilliseconds()
-        );
-      }
-    }
-
-    const theirDisplayName = chat.members.filter(
-      (m) => m.userId !== this.userId
-    )[0].email;
-
-    return {
+    this.chatDetail = {
       threadId: chatId,
-      topic: 'Chat with ' + theirDisplayName,
+      topic: '',
       members: [],
       lastMessageTime: new Date(),
-      theirDisplayName: theirDisplayName,
-      messages: messagesParsed,
+      theirDisplayName: '',
+      messages: [],
     };
+    this.chatDetail$.next(this.chatDetail);
+
+    this.chats$.subscribe((chats) => {
+      var chat = chats.find((c) => c.threadId == chatId);
+      if (chat && this.chatDetail.threadId == chat.threadId) {
+        this.chatDetail.topic = chat.topic;
+        this.chatDetail.members = chat.members;
+        this.chatDetail.lastMessageTime = chat.lastMessageTime;
+        if (chat.createdByUserId == this.userId) {
+          this.chatDetail.theirDisplayName = chat.invitedUserEmail;
+        } else {
+          this.chatDetail.theirDisplayName = chat.createdByEmail;
+        }
+      }
+      this.chatDetail$.next(this.chatDetail);
+    });
+
+    setTimeout(async () => {
+      const messages = this.chatClient
+        ?.getChatThreadClient(chatId)
+        .listMessages();
+
+      var messagesParsed: Message[] | PromiseLike<Message[]> = [];
+
+      if (messages) {
+        for await (const message of messages) {
+          console.log(message.id + ' ' + message.content);
+          if (
+            message.content?.message === undefined ||
+            message.content === undefined
+          ) {
+            continue;
+          }
+          messagesParsed.push({
+            id: message.id,
+            text: message.content?.message as string,
+            senderDisplayName: message.senderDisplayName as string,
+            createdOn: message.createdOn,
+            isMine: (message.sender as any).communicationUserId === this.userId,
+            sequenceId: parseInt(message.sequenceId),
+          });
+
+          messagesParsed = messagesParsed.sort(
+            (a, b) => a.sequenceId - b.sequenceId
+          );
+        }
+      }
+      if (this.chatDetail.threadId == chatId) {
+        this.chatDetail.messages = messagesParsed;
+        this.chatDetail$.next(this.chatDetail);
+      }
+    }, 1);
+
+    return this.chatDetail$;
   }
 
   async sendMessage(chatId: string, message: string) {

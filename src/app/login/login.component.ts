@@ -13,7 +13,7 @@ export class LoginComponent {
   constructor(private chatService: ChatService, private router: Router) {}
 
   async login() {
-    await this.chatService.init(this.email);
+    await this.chatService.login(this.email);
     this.router.navigate(['/chats']);
   }
 }

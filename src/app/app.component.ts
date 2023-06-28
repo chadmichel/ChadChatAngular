@@ -25,11 +25,7 @@ export class AppComponent {
     });
   }
 
-  async ngOnInit() {
-    if (!this.chatService.reInit()) {
-      this.router.navigate(['login']);
-    }
-  }
+  async ngOnInit() {}
 
   newConversation(): void {
     const dialogRef = this.dialog.open(EmailDialogComponent, {

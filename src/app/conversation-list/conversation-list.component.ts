@@ -30,6 +30,7 @@ export class ConversationListComponent {
       console.log(chats.length);
       this.chats = chats;
       this.isLoaded = true;
+      console.log('setting title');
       this.title.setTitle('Conversation List (' + chats.length + ')');
     });
   }
