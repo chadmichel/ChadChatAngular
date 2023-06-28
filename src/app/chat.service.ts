@@ -11,6 +11,7 @@ import { ChatThreadDetail } from './dtos/chat-thread-detail';
   providedIn: 'root',
 })
 export class ChatService {
+  maxMessages: number = 100;
   token: string = '';
   chatEndpoint: string = '';
   email: string = '';
@@ -48,10 +49,7 @@ export class ChatService {
       console.log('notification: ' + e);
     });
 
-    this.httpGet<ChatThread[]>('GetChats').subscribe((chats) => {
-      console.log('chats: ' + chats.length);
-      this.chats$.next(chats);
-    });
+    this.reloadChats();
 
     this.chatClient.startRealtimeNotifications();
     this.chatClient.on('chatMessageReceived', (e) => {
@@ -71,6 +69,17 @@ export class ChatService {
         this.chatDetail$.value.messages.push(message);
         this.chatDetail$.next(this.chatDetail$.value);
       }
+    });
+
+    this.chatClient.on('chatThreadCreated', (e) => {
+      this.reloadChats();
+    });
+  }
+
+  private reloadChats() {
+    this.httpGet<ChatThread[]>('GetChats').subscribe((chats) => {
+      console.log('chats: ' + chats.length);
+      this.chats$.next(chats);
     });
   }
 
@@ -155,6 +164,14 @@ export class ChatService {
           messagesParsed = messagesParsed.sort(
             (a, b) => a.sequenceId - b.sequenceId
           );
+
+          // only allow 100 messages in UI
+          // this maybe could be a larger number
+          if (messagesParsed.length > this.maxMessages) {
+            messagesParsed = messagesParsed.slice(
+              messagesParsed.length - this.maxMessages
+            );
+          }
         }
       }
       if (chatDetail.threadId == chatId) {
@@ -178,10 +195,7 @@ export class ChatService {
 
   async createConversation(email: string) {
     var response = (await firstValueFrom(
-      this.http.post(`${this.getServiceUrl()}/api/CreateChat`, {
-        creatorEmail: this.email,
-        creatorUserId: this.userId,
-        token: this.token,
+      this.httpPost('CreateChat', {
         inviteEmail: email,
       })
     )) as any;
