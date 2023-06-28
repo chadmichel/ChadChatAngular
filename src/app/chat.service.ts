@@ -69,6 +69,13 @@ export class ChatService {
         this.chatDetail$.value.messages.push(message);
         this.chatDetail$.next(this.chatDetail$.value);
       }
+
+      var chat = this.chats$.value.find((c) => c.threadId == e.threadId);
+      if (chat) {
+        chat.lastMessageTime = new Date(e.createdOn);
+        chat.lastMessage = e.message;
+        this.chats$.next(this.chats$.value);
+      }
     });
 
     this.chatClient.on('chatThreadCreated', (e) => {
@@ -184,10 +191,17 @@ export class ChatService {
   }
 
   async sendMessage(chatId: string, message: string) {
+    var result = (await firstValueFrom(
+      this.httpPost('LogMessage', {
+        threadId: chatId,
+        message: message,
+      })
+    )) as any;
+    console.log(result);
     const chatThread = this.chatClient?.getChatThreadClient(chatId);
     if (chatThread) {
       const sendResult = await chatThread.sendMessage({
-        content: message,
+        content: result.message,
       });
       console.log(sendResult.id);
     }
