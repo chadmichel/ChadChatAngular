@@ -58,6 +58,26 @@ export class ChatService {
       }
       this.chats$.next(chats);
     });
+
+    this.chatClient.startRealtimeNotifications();
+    this.chatClient.on('chatMessageReceived', (e) => {
+      console.log('notification: ' + e);
+
+      if (this.chatDetail$.value.threadId == e.threadId) {
+        var senderId = (e.sender as any).communicationUserId;
+        const mine = senderId == this.userId;
+        var message: Message = {
+          id: e.id,
+          text: e.message,
+          senderDisplayName: e.senderDisplayName,
+          createdOn: new Date(e.createdOn),
+          isMine: mine,
+          sequenceId: 1000, // we don't get sequence from event :(
+        };
+        this.chatDetail$.value.messages.push(message);
+        this.chatDetail$.next(this.chatDetail$.value);
+      }
+    });
   }
 
   async login(email: string) {
@@ -129,7 +149,7 @@ export class ChatService {
           messagesParsed.push({
             id: message.id,
             text: message.content?.message as string,
-            senderDisplayName: message.senderDisplayName as string,
+            senderDisplayName: this.chatDetail.theirDisplayName,
             createdOn: message.createdOn,
             isMine: (message.sender as any).communicationUserId === this.userId,
             sequenceId: parseInt(message.sequenceId),
@@ -172,14 +192,6 @@ export class ChatService {
   }
 
   isReady() {
-    console.log('isReady ' + this.tokenExpiresOn);
-    console.log('chatClient ' + this.chatClient);
-    if (this.tokenExpiresOn! < new Date()) {
-      console.log('token expired');
-    }
-    if (this.tokenExpiresOn! >= new Date()) {
-      console.log('token not expired');
-    }
     return (
       this.chatClient != undefined &&
       this.token != '' &&
@@ -214,9 +226,9 @@ export class ChatService {
   private requestOptions() {
     return {
       headers: new HttpHeaders({
-        Token: this.token,
-        userId: this.userId,
-        userEmail: this.email,
+        Token: this.token ?? '',
+        userId: this.userId ?? '',
+        userEmail: this.email ?? '',
       }),
     };
   }

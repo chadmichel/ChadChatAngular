@@ -14,7 +14,6 @@ import { ChatThreadDetail } from '../dtos/chat-thread-detail';
 export class ConversationComponent {
   newMessage: string = '';
   id: string = '';
-  messages: any[] = [];
 
   chatDetail: BehaviorSubject<ChatThreadDetail> =
     new BehaviorSubject<ChatThreadDetail>({
@@ -38,10 +37,13 @@ export class ConversationComponent {
   async ngOnInit() {
     this.activeRoute.params.subscribe(async (params) => {
       this.id = params['id'];
-      var chat = await this.chatService.getChat(this.id);
-      this.chatDetail = chat;
-      this.messages = chat.value.messages;
-      this.title.setTitle('Chat with ' + chat.value.theirDisplayName);
+      this.chatDetail = await this.chatService.getChat(this.id);
+      this.chatDetail.subscribe((chat) => {
+        this.title.setTitle('Chat with ' + chat.theirDisplayName);
+        this.scrollToBottom();
+      });
+
+      this.scrollToBottom();
     });
   }
 
@@ -49,6 +51,13 @@ export class ConversationComponent {
     if (this.newMessage.length > 0) {
       this.chatService.sendMessage(this.id, this.newMessage);
       this.newMessage = '';
+    }
+  }
+
+  scrollToBottom() {
+    var element = document.getElementById('chatmessages');
+    if (element) {
+      element.scrollTop = element.scrollHeight;
     }
   }
 }

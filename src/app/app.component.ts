@@ -18,12 +18,7 @@ export class AppComponent {
     private title: Title,
     private dialog: MatDialog,
     private chatService: ChatService
-  ) {
-    this.router.events.subscribe((val) => {
-      console.log(val);
-      this.pageTitle = this.title.getTitle();
-    });
-  }
+  ) {}
 
   async ngOnInit() {}
 
