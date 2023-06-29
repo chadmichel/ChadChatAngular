@@ -103,7 +103,18 @@ sequenceDiagram
     Function Backend->>+Frontend ChatService: List of chats
 ```
 
-4. Send and Receive Messages
+4. Send Messages
+
+```mermaid
+sequenceDiagram
+    Frontend ChatService->>+Function Backend: LogMessage
+    Function Backend->>+BadWords: Clean Message
+    BadWords->>+Function Backend: Cleaned Message
+    Function Backend->>+Table Storage: Log Message
+    Frontend ChatService->>+Azure Chat: sendMessage
+```
+
+5. Send Messages
 
 ```mermaid
 sequenceDiagram
