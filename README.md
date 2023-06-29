@@ -69,3 +69,53 @@ return this.http.post<T>(
 );
 }
 ```
+
+## Chat Sequence Diagrams
+
+1. Init
+
+```Mermaid
+sequenceDiagram
+    Frontend ChatService->>+Function Backend: 'Init'
+    Function Backend->>+Azure Chat: Get User Token
+    Function Backend->>+Table Storage: Store User
+    Function Backend->>+Frontend ChatService: Return User Token
+```
+
+2. Create Chat
+
+```Mermaid
+sequenceDiagram
+    Frontend ChatService->>+Function Backend: 'CreateChat'
+    Function Backend->>+Azure Chat: Create Chat
+    Function Backend->>+Table Storage: Store Chat
+    Function Backend->>+Frontend ChatService: Return Chat Id
+```
+
+3. Get Chat
+
+```Mermaid
+sequenceDiagram
+    Frontend ChatService->>+Function Backend: 'GetChats'
+    Function Backend->>+Azure Chat: listChatThreads
+    Function Backend->>+Table Storage: getChats
+    Function Backend->>+Function Backend: filter list
+    Function Backend->>+Frontend ChatService: List of chats
+```
+
+4. Send and Receive Messages
+
+```Mermaid
+sequenceDiagram
+    Frontend ChatService->>+Function Backend: LogMessage
+    Function Backend->>+BadWords: Clean Message
+    BadWords->>+Function Backend: Cleaned Message
+    Function Backend->>+Table Storage: Log Message
+    Frontend ChatService->>+Azure Chat: sendMessage
+```
+
+## Related Blog Post Series
+
+[Part 1 - Angular Setup](https://dontpaniclabs.com/blog/post/2023/04/27/building-a-chat-system-part-1/)
+
+[Part 2 - Azure Chat](https://dontpaniclabs.com/blog/post/2023/05/09/building-a-chat-system-part-2/)
