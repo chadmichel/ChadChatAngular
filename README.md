@@ -84,7 +84,7 @@ sequenceDiagram
 
 2. Create Chat
 
-```Mermaid
+```mermaid
 sequenceDiagram
     Frontend ChatService->>+Function Backend: 'CreateChat'
     Function Backend->>+Azure Chat: Create Chat
@@ -94,7 +94,7 @@ sequenceDiagram
 
 3. Get Chat
 
-```Mermaid
+```mermaid
 sequenceDiagram
     Frontend ChatService->>+Function Backend: 'GetChats'
     Function Backend->>+Azure Chat: listChatThreads
@@ -105,7 +105,7 @@ sequenceDiagram
 
 4. Send and Receive Messages
 
-```Mermaid
+```mermaid
 sequenceDiagram
     Frontend ChatService->>+Function Backend: LogMessage
     Function Backend->>+BadWords: Clean Message
