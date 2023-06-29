@@ -74,7 +74,7 @@ return this.http.post<T>(
 
 1. Init
 
-```Mermaid
+```mermaid
 sequenceDiagram
     Frontend ChatService->>+Function Backend: 'Init'
     Function Backend->>+Azure Chat: Get User Token
