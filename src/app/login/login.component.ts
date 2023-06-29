@@ -9,10 +9,18 @@ import { Router } from '@angular/router';
 })
 export class LoginComponent {
   email: string = '';
+  code: string = '';
+  apiUri: string = '';
 
-  constructor(private chatService: ChatService, private router: Router) {}
+  constructor(private chatService: ChatService, private router: Router) {
+    this.email = chatService.getEmail();
+    this.apiUri = chatService.getServiceUrl();
+    this.code = chatService.getCode();
+  }
 
   async login() {
+    this.chatService.setCode(this.code);
+    this.chatService.setServiceUrl(this.apiUri);
     await this.chatService.login(this.email);
     this.router.navigate(['/chats']);
   }

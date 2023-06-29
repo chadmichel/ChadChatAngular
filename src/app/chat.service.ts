@@ -258,23 +258,49 @@ export class ChatService {
     };
   }
 
-  getServiceUrl() {
-    if (location.hostname === 'localhost') {
-      return 'http://localhost:7071';
+  getEmail() {
+    return this.email;
+  }
+
+  // Code for calling Azure Function API
+  private code = '';
+  getCode() {
+    if (this.code == undefined || this.code == '') {
+      this.code = localStorage.getItem('code') ?? '';
     }
-    throw new Error("Can't get service URL");
+    return this.code;
+  }
+  setCode(code: string) {
+    this.code = code;
+    localStorage.setItem('code', code);
+  }
+
+  // URL for calling Azure Function API
+  private serviceUrl = '';
+  getServiceUrl() {
+    if (this.serviceUrl == undefined || this.serviceUrl == '') {
+      this.serviceUrl = localStorage.getItem('serviceUrl') ?? '';
+    }
+    if (this.serviceUrl == undefined || this.serviceUrl == '') {
+      this.serviceUrl = 'https://localhost:7071'; // default for local dev
+    }
+    return this.serviceUrl;
+  }
+  setServiceUrl(url: string) {
+    this.serviceUrl = url;
+    localStorage.setItem('serviceUrl', url);
   }
 
   private httpGet<T>(path: string): Observable<T> {
     return this.http.get<T>(
-      `${this.getServiceUrl()}/api/${path}`,
+      `${this.getServiceUrl()}/api/${path}?code=${this.getCode()}`,
       this.requestOptions()
     );
   }
 
   private httpPost<T>(path: string, body: any): Observable<T> {
     return this.http.post<T>(
-      `${this.getServiceUrl()}/api/${path}`,
+      `${this.getServiceUrl()}/api/${path}?code=${this.getCode()}`,
       body,
       this.requestOptions()
     );

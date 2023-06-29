@@ -1,27 +1,71 @@
 # ChadChatAngular
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 15.2.6.
+## Project Overview
 
-## Development server
+This is the front end component that goes with the backend component. Combined these create a very simple chat application. Both of these can be ran together on your machine to give you a simple chat application.
+
+## Project Tech Overview
+
+Project was built using Angualr 15.2.6 and Angular Material. Backend is an Azure Function application.
+
+Frontend makes calls to an Azure function backend for some services. And uses Azure Chat service for sending and receiving messages.
+
+### Development server
 
 Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
 
-## Code scaffolding
+To run this application successfully you will also need to run the backend application.
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
-
-## Build
+### Build
 
 Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
 
-## Running unit tests
+## Azure Function Backend
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+Link: https://github.com/chadmichel/ChadChatBackend
 
-## Running end-to-end tests
+The Azure Function Backend provides a few methods used by this application.
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+### Backend API
 
-## Further help
+All calls but Init assume Token (azure chat), userId, and userEmail are passed through headers.
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+```TypeScript
+private requestOptions() {
+return {
+    headers: new HttpHeaders({
+    Token: this.token ?? '',
+    userId: this.userId ?? '',
+    userEmail: this.email ?? '',
+    }),
+};
+}
+```
+
+- Init
+  - POST /api/Init
+- CreateChat
+  - POST /api/CreateChat
+- GetChats
+  - GET /api/GetChats
+- LogMessage
+  - POST /api/LogMessage
+
+Calls to the backend API are all done in ChatService.ts.
+
+```TypeScript
+private httpGet<T>(path: string): Observable<T> {
+return this.http.get<T>(
+    `${this.getServiceUrl()}/api/${path}?code=${this.getCode()}`,
+    this.requestOptions()
+);
+}
+
+private httpPost<T>(path: string, body: any): Observable<T> {
+return this.http.post<T>(
+    `${this.getServiceUrl()}/api/${path}?code=${this.getCode()}`,
+    body,
+    this.requestOptions()
+);
+}
+```

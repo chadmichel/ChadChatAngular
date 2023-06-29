@@ -1,17 +1,38 @@
 <div class="login-container">
-  <div>
-    <mat-form-field>
-      <mat-label>Email</mat-label>
-      <input
-        matInput
-        required
-        [(ngModel)]="email"
-        name="email"
-        type="email"
-        value="cmichel@dontpaniclabs.com"
-      />
-    </mat-form-field>
-  </div>
+  <mat-form-field>
+    <mat-label>Email</mat-label>
+    <input
+      matInput
+      required
+      [(ngModel)]="email"
+      name="email"
+      type="email"
+      value="cmichel@dontpaniclabs.com"
+    />
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>Code</mat-label>
+    <input
+      matInput
+      required
+      [(ngModel)]="code"
+      name="text"
+      type="text"
+      value=""
+    />
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>API URI</mat-label>
+    <input
+      matInput
+      required
+      [(ngModel)]="apiUri"
+      name="text"
+      type="text"
+      value=""
+    />
+  </mat-form-field>
+
   <div>
     <button mat-raised-button color="primary" type="submit" (click)="login()">
       Login
