@@ -70,6 +70,12 @@ return this.http.post<T>(
 }
 ```
 
+## Companion Backend
+
+Link: https://github.com/chadmichel/ChadChatBackend
+
+The Azure Function Backend provides a few methods used by this application.
+
 ## Chat Sequence Diagrams
 
 1. Init
@@ -114,15 +120,11 @@ sequenceDiagram
     Frontend ChatService->>+Azure Chat: sendMessage
 ```
 
-5. Send Messages
+5. Receive Messages
 
 ```mermaid
 sequenceDiagram
-    Frontend ChatService->>+Function Backend: LogMessage
-    Function Backend->>+BadWords: Clean Message
-    BadWords->>+Function Backend: Cleaned Message
-    Function Backend->>+Table Storage: Log Message
-    Frontend ChatService->>+Azure Chat: sendMessage
+    Azure Chat->>+Frontend ChatService: onMessageReceived
 ```
 
 ## Related Blog Post Series

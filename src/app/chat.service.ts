@@ -22,15 +22,16 @@ export class ChatService {
 
   chats$: BehaviorSubject<ChatThread[]> = new BehaviorSubject<ChatThread[]>([]);
 
-  chatDetail$: BehaviorSubject<ChatThreadDetail> =
-    new BehaviorSubject<ChatThreadDetail>({
-      threadId: '',
-      topic: '',
-      members: [],
-      lastMessageTime: new Date(),
-      theirDisplayName: '',
-      messages: [],
-    });
+  chatDetails$ = new Map<string, BehaviorSubject<ChatThreadDetail>>();
+  //  =
+  //   new BehaviorSubject<ChatThreadDetail>({
+  //     threadId: '',
+  //     topic: '',
+  //     members: [],
+  //     lastMessageTime: new Date(),
+  //     theirDisplayName: '',
+  //     messages: [],
+  //   });
 
   constructor(private http: HttpClient) {
     this.loadFromLocalStorage();
@@ -42,20 +43,19 @@ export class ChatService {
 
   private createClient() {
     const tokenCredential = new AzureCommunicationTokenCredential(this.token);
+    if (this.chatClient) {
+      this.chatClient?.stopRealtimeNotifications();
+    }
     this.chatClient = new ChatClient(this.chatEndpoint, tokenCredential);
-
-    this.chatClient.startRealtimeNotifications();
-    this.chatClient.on('chatMessageReceived', (e) => {
-      console.log('notification: ' + e);
-    });
 
     this.reloadChats();
 
     this.chatClient.startRealtimeNotifications();
     this.chatClient.on('chatMessageReceived', (e) => {
-      console.log('notification: ' + e);
+      console.log('notification: ' + JSON.stringify(e));
 
-      if (this.chatDetail$.value.threadId == e.threadId) {
+      const chatDetail = this.chatDetails$.get(e.threadId);
+      if (chatDetail) {
         var senderId = (e.sender as any).communicationUserId;
         const mine = senderId == this.userId;
         var message: Message = {
@@ -66,8 +66,10 @@ export class ChatService {
           isMine: mine,
           sequenceId: 1000, // we don't get sequence from event :(
         };
-        this.chatDetail$.value.messages.push(message);
-        this.chatDetail$.next(this.chatDetail$.value);
+        chatDetail.value.messages.push(message);
+        chatDetail.next(chatDetail.value);
+      } else {
+        console.log('chatDetail not found for ' + e.threadId);
       }
 
       var chat = this.chats$.value.find((c) => c.threadId == e.threadId);
@@ -91,6 +93,7 @@ export class ChatService {
   }
 
   async login(email: string) {
+    this.chatDetails$.clear();
     var initResponse = (await firstValueFrom(
       this.httpPost('Init', { email: email })
     )) as any;
@@ -111,12 +114,15 @@ export class ChatService {
   }
 
   getChat(chatId: string): BehaviorSubject<ChatThreadDetail> {
-    if (this.chatDetail$.value.threadId == chatId) {
-      return this.chatDetail$;
+    // if we already have the chat detail, return it
+    let chatDetail$ = this.chatDetails$.get(chatId);
+
+    if (chatDetail$ && chatDetail$.value.threadId == chatId) {
+      return chatDetail$;
     }
 
     // clear the chat detail
-    const chatDetail = {
+    let chatDetail = {
       threadId: chatId,
       topic: '',
       members: [],
@@ -124,7 +130,9 @@ export class ChatService {
       theirDisplayName: '',
       messages: [],
     } as ChatThreadDetail;
-    this.chatDetail$.next(chatDetail);
+    chatDetail$ = new BehaviorSubject<ChatThreadDetail>(chatDetail);
+    chatDetail$.next(chatDetail);
+    this.chatDetails$.set(chatId, chatDetail$);
 
     // populate the chat detail using cached list of chats
     this.chats$.subscribe((chats) => {
@@ -139,7 +147,7 @@ export class ChatService {
           chatDetail.theirDisplayName = chat.createdByEmail;
         }
       }
-      this.chatDetail$.next(chatDetail);
+      chatDetail$?.next(chatDetail);
     });
 
     // async load the messages
@@ -183,11 +191,11 @@ export class ChatService {
       }
       if (chatDetail.threadId == chatId) {
         chatDetail.messages = messagesParsed;
-        this.chatDetail$.next(chatDetail);
+        chatDetail$?.next(chatDetail);
       }
     }, 1);
 
-    return this.chatDetail$;
+    return chatDetail$;
   }
 
   async sendMessage(chatId: string, message: string) {
