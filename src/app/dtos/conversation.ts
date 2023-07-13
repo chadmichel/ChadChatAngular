@@ -1,6 +1,6 @@
 import { ChatUser } from './chat-user';
 
-export interface ChatThread {
+export interface Conversation {
   threadId: string;
   group: string;
   topic: string;

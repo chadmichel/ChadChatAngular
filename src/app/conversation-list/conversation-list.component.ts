@@ -3,7 +3,7 @@ import { Title } from '@angular/platform-browser';
 import { ChatService } from '../chat.service';
 import { Router } from '@angular/router';
 import { Observable, of } from 'rxjs';
-import { ChatThread } from '../dtos/chat-thread';
+import { Conversation } from '../dtos/conversation';
 
 @Component({
   selector: 'app-conversation-list',
@@ -11,8 +11,8 @@ import { ChatThread } from '../dtos/chat-thread';
   styleUrls: ['./conversation-list.component.scss'],
 })
 export class ConversationListComponent {
-  chats$: Observable<ChatThread[]> = of([]);
-  chats: ChatThread[] = [];
+  chats$: Observable<Conversation[]> = of([]);
+  chats: Conversation[] = [];
   isLoaded: boolean = false;
 
   constructor(
@@ -35,7 +35,7 @@ export class ConversationListComponent {
     });
   }
 
-  openChat(chat: ChatThread) {
+  openChat(chat: Conversation) {
     this.router.navigate(['/chats', chat.threadId]);
   }
 }

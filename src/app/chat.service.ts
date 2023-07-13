@@ -3,9 +3,9 @@ import { Injectable } from '@angular/core';
 import { ChatClient, ChatMessage } from '@azure/communication-chat';
 import { AzureCommunicationTokenCredential } from '@azure/communication-common';
 import { BehaviorSubject, Observable, firstValueFrom, of } from 'rxjs';
-import { ChatThread } from './dtos/chat-thread';
+import { Conversation } from './dtos/conversation';
 import { Message } from './dtos/message';
-import { ChatThreadDetail } from './dtos/chat-thread-detail';
+import { ConversationDetail } from './dtos/conversation-detail';
 
 @Injectable({
   providedIn: 'root',
@@ -20,18 +20,11 @@ export class ChatService {
 
   chatClient: ChatClient | undefined;
 
-  chats$: BehaviorSubject<ChatThread[]> = new BehaviorSubject<ChatThread[]>([]);
+  chats$: BehaviorSubject<Conversation[]> = new BehaviorSubject<Conversation[]>(
+    []
+  );
 
-  chatDetails$ = new Map<string, BehaviorSubject<ChatThreadDetail>>();
-  //  =
-  //   new BehaviorSubject<ChatThreadDetail>({
-  //     threadId: '',
-  //     topic: '',
-  //     members: [],
-  //     lastMessageTime: new Date(),
-  //     theirDisplayName: '',
-  //     messages: [],
-  //   });
+  chatDetails$ = new Map<string, BehaviorSubject<ConversationDetail>>();
 
   constructor(private http: HttpClient) {
     this.loadFromLocalStorage();
@@ -48,7 +41,7 @@ export class ChatService {
     }
     this.chatClient = new ChatClient(this.chatEndpoint, tokenCredential);
 
-    this.reloadChats();
+    this.reloadConversations();
 
     this.chatClient.startRealtimeNotifications();
     this.chatClient.on('chatMessageReceived', (e) => {
@@ -81,12 +74,12 @@ export class ChatService {
     });
 
     this.chatClient.on('chatThreadCreated', (e) => {
-      this.reloadChats();
+      this.reloadConversations();
     });
   }
 
-  private reloadChats() {
-    this.httpGet<ChatThread[]>('GetChats').subscribe((chats) => {
+  private reloadConversations() {
+    this.httpGet<Conversation[]>('GetChats').subscribe((chats) => {
       console.log('chats: ' + chats.length);
       this.chats$.next(chats);
     });
@@ -109,11 +102,11 @@ export class ChatService {
     this.saveToLocalStorage();
   }
 
-  getChats(): Observable<ChatThread[]> {
+  getChats(): Observable<Conversation[]> {
     return this.chats$;
   }
 
-  getChat(chatId: string): BehaviorSubject<ChatThreadDetail> {
+  getChat(chatId: string): BehaviorSubject<ConversationDetail> {
     // if we already have the chat detail, return it
     let chatDetail$ = this.chatDetails$.get(chatId);
 
@@ -129,8 +122,8 @@ export class ChatService {
       lastMessageTime: new Date(),
       theirDisplayName: '',
       messages: [],
-    } as ChatThreadDetail;
-    chatDetail$ = new BehaviorSubject<ChatThreadDetail>(chatDetail);
+    } as ConversationDetail;
+    chatDetail$ = new BehaviorSubject<ConversationDetail>(chatDetail);
     chatDetail$.next(chatDetail);
     this.chatDetails$.set(chatId, chatDetail$);
 

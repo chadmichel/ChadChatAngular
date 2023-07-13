@@ -3,7 +3,7 @@ import { Title } from '@angular/platform-browser';
 import { ChatService } from '../chat.service';
 import { ActivatedRoute, Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { ChatThreadDetail } from '../dtos/chat-thread-detail';
+import { ConversationDetail } from '../dtos/conversation-detail';
 
 @Component({
   selector: 'app-conversation',
@@ -14,8 +14,8 @@ export class ConversationComponent {
   newMessage: string = '';
   id: string = '';
 
-  chatDetail: BehaviorSubject<ChatThreadDetail> =
-    new BehaviorSubject<ChatThreadDetail>({
+  chatDetail: BehaviorSubject<ConversationDetail> =
+    new BehaviorSubject<ConversationDetail>({
       threadId: '',
       topic: '',
       members: [],
