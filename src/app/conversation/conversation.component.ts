@@ -2,7 +2,6 @@ import { Component } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ChatService } from '../chat.service';
 import { ActivatedRoute, Router } from '@angular/router';
-import { TimeAgoPipe } from 'time-ago-pipe';
 import { BehaviorSubject } from 'rxjs';
 import { ChatThreadDetail } from '../dtos/chat-thread-detail';
 
