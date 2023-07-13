@@ -1,7 +1,7 @@
 import { ChatUser } from './chat-user';
 
 export interface Conversation {
-  threadId: string;
+  conversationId: string;
   group: string;
   topic: string;
   createdTime: Date;

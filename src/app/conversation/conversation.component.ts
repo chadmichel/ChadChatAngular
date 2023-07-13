@@ -16,7 +16,7 @@ export class ConversationComponent {
 
   chatDetail: BehaviorSubject<ConversationDetail> =
     new BehaviorSubject<ConversationDetail>({
-      threadId: '',
+      conversationId: '',
       topic: '',
       members: [],
       lastMessageTime: new Date(),

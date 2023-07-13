@@ -65,7 +65,7 @@ export class ChatService {
         console.log('chatDetail not found for ' + e.threadId);
       }
 
-      var chat = this.chats$.value.find((c) => c.threadId == e.threadId);
+      var chat = this.chats$.value.find((c) => c.conversationId == e.threadId);
       if (chat) {
         chat.lastMessageTime = new Date(e.createdOn);
         chat.lastMessage = e.message;
@@ -79,7 +79,7 @@ export class ChatService {
   }
 
   private reloadConversations() {
-    this.httpGet<Conversation[]>('GetChats').subscribe((chats) => {
+    this.httpGet<Conversation[]>('GetConversations').subscribe((chats) => {
       console.log('chats: ' + chats.length);
       this.chats$.next(chats);
     });
@@ -110,13 +110,13 @@ export class ChatService {
     // if we already have the chat detail, return it
     let chatDetail$ = this.chatDetails$.get(chatId);
 
-    if (chatDetail$ && chatDetail$.value.threadId == chatId) {
+    if (chatDetail$ && chatDetail$.value.conversationId == chatId) {
       return chatDetail$;
     }
 
     // clear the chat detail
     let chatDetail = {
-      threadId: chatId,
+      conversationId: chatId,
       topic: '',
       members: [],
       lastMessageTime: new Date(),
@@ -129,8 +129,8 @@ export class ChatService {
 
     // populate the chat detail using cached list of chats
     this.chats$.subscribe((chats) => {
-      var chat = chats.find((c) => c.threadId == chatId);
-      if (chat && chatDetail.threadId == chat.threadId) {
+      var chat = chats.find((c) => c.conversationId == chatId);
+      if (chat && chatDetail.conversationId == chat.conversationId) {
         chatDetail.topic = chat.topic;
         chatDetail.members = chat.members;
         chatDetail.lastMessageTime = chat.lastMessageTime;
@@ -182,7 +182,7 @@ export class ChatService {
           }
         }
       }
-      if (chatDetail.threadId == chatId) {
+      if (chatDetail.conversationId == chatId) {
         chatDetail.messages = messagesParsed;
         chatDetail$?.next(chatDetail);
       }
@@ -210,7 +210,7 @@ export class ChatService {
 
   async createConversation(email: string) {
     var response = (await firstValueFrom(
-      this.httpPost('CreateChat', {
+      this.httpPost('CreateConversation', {
         inviteEmail: email,
       })
     )) as any;

@@ -36,6 +36,6 @@ export class ConversationListComponent {
   }
 
   openChat(chat: Conversation) {
-    this.router.navigate(['/chats', chat.threadId]);
+    this.router.navigate(['/chats', chat.conversationId]);
   }
 }
