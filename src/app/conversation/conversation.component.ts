@@ -1,8 +1,8 @@
 import { Component } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ChatService } from '../chat.service';
-import { ActivatedRoute, Router } from '@angular/router';
-import { BehaviorSubject } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
+import { BehaviorSubject, filter, map, switchMap } from 'rxjs';
 import { ConversationDetail } from '../dtos/conversation-detail';
 
 @Component({
@@ -25,25 +25,27 @@ export class ConversationComponent {
     });
 
   constructor(
-    private title: Title,
-    private chatService: ChatService,
-    private router: Router,
-    private activeRoute: ActivatedRoute
+    private readonly title: Title,
+    private readonly chatService: ChatService,
+    private readonly activeRoute: ActivatedRoute
   ) {
     this.title.setTitle('Conversation');
-  }
 
-  async ngOnInit() {
-    this.activeRoute.params.subscribe(async (params) => {
-      this.id = params['id'];
-      this.chatDetail = await this.chatService.getChat(this.id);
-      this.chatDetail.subscribe((chat) => {
+    this.activeRoute.params
+      .pipe(
+        filter((params) => params['id']),
+        switchMap((params) =>
+          this.chatService.chatDetails$.pipe(
+            map((details) => details[params['id']])
+          )
+        )
+      )
+      .subscribe((chat) => {
+        this.id = chat.conversationId;
+        this.chatDetail.next(chat);
         this.title.setTitle('Chat with ' + chat.theirDisplayName);
         this.scrollToBottom();
       });
-
-      this.scrollToBottom();
-    });
   }
 
   async sendMessage() {
@@ -54,7 +56,7 @@ export class ConversationComponent {
   }
 
   scrollToBottom() {
-    var element = document.getElementById('chatmessages');
+    const element = document.getElementById('chatmessages');
     if (element) {
       element.scrollTop = element.scrollHeight;
     }

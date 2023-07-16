@@ -13,7 +13,7 @@ export class LoginComponent {
   apiUri: string = '';
 
   constructor(private chatService: ChatService, private router: Router) {
-    this.email = chatService.getEmail();
+    this.email = chatService.getEmail() ?? '';
     this.apiUri = chatService.getServiceUrl();
     this.code = chatService.getCode();
   }
