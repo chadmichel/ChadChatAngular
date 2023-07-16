@@ -283,7 +283,7 @@ export class ChatService {
       this.serviceUrl = localStorage.getItem('serviceUrl') ?? '';
     }
     if (this.serviceUrl == undefined || this.serviceUrl == '') {
-      this.serviceUrl = 'https://localhost:7071'; // default for local dev
+      this.serviceUrl = 'https://localhost:7072'; // default for local dev
     }
     return this.serviceUrl;
   }
