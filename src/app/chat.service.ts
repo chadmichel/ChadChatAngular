@@ -46,6 +46,12 @@ export class ChatService extends ComponentStore<ChatState> {
     private readonly storageService: StorageService
   ) {
     super({ chats: {}, chatDetails: {} });
+
+    const email = this.storageService.getCache('email');
+
+    if (email) {
+      this.login(email);
+    }
   }
 
   public readonly login = this.effect((email$: Observable<string>) => {
@@ -298,10 +304,6 @@ export class ChatService extends ComponentStore<ChatState> {
       })
     );
   });
-
-  getEmail() {
-    return this.get(({ clientState }) => clientState?.email);
-  }
 
   // Code for calling Azure Function API
   private code = '';

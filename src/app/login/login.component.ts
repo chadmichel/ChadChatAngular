@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { ChatService } from '../chat.service';
 import { Router } from '@angular/router';
+import { StorageService } from '../storage.service';
 
 @Component({
   selector: 'app-login',
@@ -8,17 +9,23 @@ import { Router } from '@angular/router';
   styleUrls: ['./login.component.scss'],
 })
 export class LoginComponent {
-  email: string = '';
+  email: string;
   code: string = '';
   apiUri: string = '';
 
-  constructor(private chatService: ChatService, private router: Router) {
-    this.email = chatService.getEmail() ?? '';
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly storageService: StorageService,
+    private router: Router
+  ) {
     this.apiUri = chatService.getServiceUrl();
     this.code = chatService.getCode();
+    this.email = this.storageService.getCache('email') || '';
   }
 
   login() {
+    this.storageService.cache('email', this.email);
+
     this.chatService.setCode(this.code);
     this.chatService.setServiceUrl(this.apiUri);
     this.chatService.login(this.email);
@@ -32,5 +39,10 @@ export class LoginComponent {
         console.log('LoginComponent: isnot ready');
       }
     });
+  }
+
+  logout() {
+    this.storageService.clearCache('email');
+    this.chatService.logout();
   }
 }
