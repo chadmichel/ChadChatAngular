@@ -22,17 +22,13 @@ export class ConversationListComponent {
 
     this.chats$ = chatService.chats$.pipe(
       map((chats) => {
-        return Object.values(chats).sort((a, b) => {
-          return (
+        return Object.values(chats).sort(
+          (a, b) =>
             new Date(b.lastMessageTime).getTime() -
             new Date(a.lastMessageTime).getTime()
-          );
-        });
+        );
       }),
       tap((chats) => {
-        console.log('loaded');
-        console.log(chats.length);
-        console.log('setting title');
         this.title.setTitle('Conversation List (' + chats.length + ')');
       })
     );

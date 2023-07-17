@@ -32,7 +32,7 @@ export class ConversationComponent implements OnInit {
       map((chatDetails) => chatDetails[this.conversationId].messages)
     );
 
-    this.chatService.initializeChatDetails(this.conversationId);
+    this.chatService.loadChatDetails(this.conversationId);
   }
 
   public sendMessage() {

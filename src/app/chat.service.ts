@@ -9,6 +9,9 @@ import { AzureCommunicationTokenCredential } from '@azure/communication-common';
 import {
   EMPTY,
   Observable,
+  combineLatest,
+  combineLatestWith,
+  concatWith,
   exhaustMap,
   filter,
   from,
@@ -17,6 +20,7 @@ import {
   reduce,
   switchMap,
   tap,
+  withLatestFrom,
 } from 'rxjs';
 import { Chat } from './dtos/conversation';
 import { ChatDetail } from './dtos/conversation-detail';
@@ -30,7 +34,10 @@ import { StorageService } from './storage.service';
 export class ChatService extends ComponentStore<ChatState> {
   private readonly maxMessages: number = 100;
 
-  public readonly chats$ = this.select(({ chats }) => chats);
+  public readonly chats$ = this.select(({ chats }) => chats).pipe(
+    filter((chats) => chats !== undefined),
+    map((chats) => chats!)
+  );
 
   public readonly chatDetails$ = this.select(({ chatDetails }) => chatDetails);
 
@@ -45,7 +52,7 @@ export class ChatService extends ComponentStore<ChatState> {
     private readonly http: HttpClient,
     private readonly storageService: StorageService
   ) {
-    super({ chats: {}, chatDetails: {} });
+    super({ chatDetails: {} });
 
     const email = this.storageService.getCache('email');
 
@@ -101,7 +108,7 @@ export class ChatService extends ComponentStore<ChatState> {
 
   private readonly addMessage = this.updater(
     (state, event: ChatMessageReceivedEvent) => {
-      const chat = state.chats[event.threadId];
+      const chat = state.chats![event.threadId];
       const chatDetail = state.chatDetails[event.threadId];
 
       // TODO what does it mean if these are null? how did we get here?
@@ -170,13 +177,15 @@ export class ChatService extends ComponentStore<ChatState> {
     }
   );
 
-  public readonly initializeChatDetails = this.effect(
+  public readonly loadChatDetails = this.effect(
     (conversationId$: Observable<string>) => {
       return conversationId$.pipe(
-        tap((conversationId) =>
+        // Wait for chats before initializing chat details
+        combineLatestWith(this.chats$),
+        tap(([conversationId]) =>
           console.log('initializing chat details for ' + conversationId)
         ),
-        switchMap((conversationId) => {
+        switchMap(([conversationId, chats]) => {
           const details = this.get(
             (state) => state.chatDetails[conversationId]
           );
@@ -205,8 +214,6 @@ export class ChatService extends ComponentStore<ChatState> {
           ).pipe(
             filter((message) => message.content?.message !== undefined),
             reduce<ChatMessage, Message[]>((acc, message) => {
-              console.log(message.id + ' ' + message.content);
-
               const messageParsed: Message = {
                 id: message.id,
                 text: message.content!.message!,
@@ -223,7 +230,7 @@ export class ChatService extends ComponentStore<ChatState> {
               messages.sort((a, b) => b.sequenceId - a.sequenceId)
             ),
             map((messages): ChatDetail => {
-              const chat = this.get((state) => state.chats[conversationId])!;
+              const chat = chats[conversationId];
 
               return {
                 conversationId: conversationId,
@@ -363,8 +370,8 @@ export class ChatService extends ComponentStore<ChatState> {
 }
 
 export interface ChatState {
-  chats: Chats;
-  chatDetails: ConversationDetails;
+  chats?: Chats;
+  chatDetails: ChatDetails;
   clientState?: ClientState;
 }
 
@@ -372,7 +379,7 @@ export interface Chats {
   [threadId: string]: Chat;
 }
 
-export interface ConversationDetails {
+export interface ChatDetails {
   [threadId: string]: ChatDetail;
 }
 
