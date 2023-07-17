@@ -9,11 +9,11 @@ import { AzureCommunicationTokenCredential } from '@azure/communication-common';
 import {
   EMPTY,
   Observable,
-  distinctUntilChanged,
   exhaustMap,
   filter,
   from,
   map,
+  of,
   reduce,
   switchMap,
   tap,
@@ -30,11 +30,11 @@ import { StorageService } from './storage.service';
 export class ChatService extends ComponentStore<ChatState> {
   private readonly maxMessages: number = 100;
 
-  private chatClient: ChatClient | undefined;
-
   public readonly chats$ = this.select(({ chats }) => chats);
 
   public readonly chatDetails$ = this.select(({ chatDetails }) => chatDetails);
+
+  private chatClient: ChatClient | undefined;
 
   public readonly isReady$ = this.select(
     ({ clientState }) =>
@@ -43,70 +43,57 @@ export class ChatService extends ComponentStore<ChatState> {
 
   constructor(
     private readonly http: HttpClient,
-    storageService: StorageService
+    private readonly storageService: StorageService
   ) {
-    super({
-      chats: {},
-      chatDetails: {},
-      clientState: storageService.getCache('chatClientState'),
-    });
-
-    // Changes to clientState will cache the state and create a new client if needed
-    this.state$
-      .pipe(
-        filter(({ clientState }) => clientState !== undefined),
-        map(({ clientState }) => clientState!),
-        distinctUntilChanged()
-      )
-      .subscribe((clientState) => {
-        storageService.cache('chatClientState', clientState);
-
-        if (new Date(clientState.expiresOn) > new Date()) {
-          this.createClient(clientState.endpoint, clientState.token);
-        }
-      });
+    super({ chats: {}, chatDetails: {} });
   }
 
-  // TODO effect? put on state?
-  private createClient(endpoint: string, token: string) {
-    const tokenCredential = new AzureCommunicationTokenCredential(token);
+  public readonly login = this.effect((email$: Observable<string>) => {
+    return email$.pipe(
+      switchMap((email) => {
+        const cachedState = this.storageService.getCache('chatClientState');
 
-    this.chatClient?.stopRealtimeNotifications();
-    this.chatClient = new ChatClient(endpoint, tokenCredential);
+        const clientState$ =
+          cachedState && new Date(cachedState.expiresOn) > new Date()
+            ? of(cachedState)
+            : this.httpPost<ClientState>('Init', { email: email });
 
-    this.reloadChats();
-
-    this.chatClient.startRealtimeNotifications();
-    this.chatClient.on('chatMessageReceived', (e) => this.addNewChatMessage(e));
-    this.chatClient.on('chatThreadCreated', () => this.reloadChats());
-  }
-
-  // TODO this gets all chats again when 1 is added, is that necessary?
-  private readonly reloadChats = this.effect<void>(($) =>
-    $.pipe(
-      exhaustMap(() =>
-        this.httpGet<Chat[]>('GetConversations').pipe(
+        return clientState$.pipe(
           tapResponse(
-            (chats) => this.initializeChats(chats),
+            (clientState) => {
+              this.storageService.cache('chatClientState', clientState);
+              this.patchState({ clientState });
+              this.createClient(clientState.endpoint, clientState.token);
+            },
             (err) => console.error(err)
           )
-        )
-      )
+        );
+      })
+    );
+  });
+
+  public readonly logout = this.effect<void>(($) =>
+    $.pipe(
+      tap(() => {
+        this.storageService.clearCache('chatClientState');
+        this.chatClient?.stopRealtimeNotifications();
+        this.chatClient = undefined;
+      })
     )
   );
 
-  private readonly initializeChats = this.updater(
-    (state, chats: Chat[]): ChatState => {
-      const chatsDict = chats.reduce((acc, chat) => {
-        acc[chat.conversationId] = chat;
-        return acc;
-      }, {} as { [id: string]: Chat });
+  private createClient(endpoint: string, token: string) {
+    const tokenCredential = new AzureCommunicationTokenCredential(token);
 
-      return { ...state, chats: chatsDict };
-    }
-  );
+    this.chatClient = new ChatClient(endpoint, tokenCredential);
+    this.chatClient.startRealtimeNotifications();
+    this.chatClient.on('chatMessageReceived', (e) => this.addMessage(e));
+    this.chatClient.on('chatThreadCreated', () => this.reloadChats());
 
-  private readonly addNewChatMessage = this.updater(
+    this.reloadChats();
+  }
+
+  private readonly addMessage = this.updater(
     (state, event: ChatMessageReceivedEvent) => {
       const chat = state.chats[event.threadId];
       const chatDetail = state.chatDetails[event.threadId];
@@ -143,7 +130,6 @@ export class ChatService extends ComponentStore<ChatState> {
 
       console.log('new chat message added');
 
-      // return state copy with chatDetail replaced in the chatDetails dictionary
       return {
         ...state,
         chatDetails: {
@@ -151,27 +137,30 @@ export class ChatService extends ComponentStore<ChatState> {
           [event.threadId]: chatDetail,
         },
       };
-
-      // return { ...state, chatDetails: { ...state.chatDetails } };
     }
   );
 
-  public readonly login = this.effect((email$: Observable<string>) => {
-    return email$.pipe(
-      switchMap((email) => {
-        return this.httpPost<ClientState>('Init', { email: email }).pipe(
+  private readonly reloadChats = this.effect<void>(($) =>
+    $.pipe(
+      exhaustMap(() =>
+        this.httpGet<Chat[]>('GetConversations').pipe(
           tapResponse(
-            (initResponse) => this.initializeClientState(initResponse),
+            (chats) => this.setChats(chats),
             (err) => console.error(err)
           )
-        );
-      })
-    );
-  });
+        )
+      )
+    )
+  );
 
-  private readonly initializeClientState = this.updater(
-    (state, clientState: ClientState) => {
-      return { ...state, clientState };
+  private readonly setChats = this.updater(
+    (state, chats: Chat[]): ChatState => {
+      const chatsDict = chats.reduce((acc, chat) => {
+        acc[chat.conversationId] = chat;
+        return acc;
+      }, {} as { [id: string]: Chat });
+
+      return { ...state, chats: chatsDict };
     }
   );
 
@@ -252,7 +241,7 @@ export class ChatService extends ComponentStore<ChatState> {
     }
   );
 
-  public readonly addChatDetail = this.updater(
+  private readonly addChatDetail = this.updater(
     (state, chatDetail: ChatDetail) => {
       console.log('adding chat detail for ' + chatDetail.conversationId);
 
@@ -284,7 +273,8 @@ export class ChatService extends ComponentStore<ChatState> {
             })
           ).pipe(
             tapResponse(
-              (response) => console.log(response.id),
+              // No action necessary with response
+              (response) => console.log('Message sent :' + response.id),
               (err) => console.error(err)
             )
           );
@@ -293,35 +283,21 @@ export class ChatService extends ComponentStore<ChatState> {
     }
   );
 
-  // TODO creating the chat.. can we then put it in the dict of chats?
-  public readonly createConversation = this.effect(
-    (email$: Observable<string>) => {
-      return email$.pipe(
-        switchMap((email) => {
-          return this.httpPost('CreateConversation', {
-            inviteEmail: email,
-          }).pipe(
-            tapResponse(
-              (response) => console.log(response),
-              (err) => console.error(err)
-            )
-          );
-        })
-      );
-    }
-  );
-
-  private requestOptions() {
-    return this.get(({ clientState }) => {
-      return {
-        headers: new HttpHeaders({
-          Token: clientState?.token ?? '',
-          userId: clientState?.userId ?? '',
-          userEmail: clientState?.email ?? '',
-        }),
-      };
-    });
-  }
+  public readonly createChat = this.effect((email$: Observable<string>) => {
+    return email$.pipe(
+      switchMap((email) => {
+        return this.httpPost('CreateConversation', {
+          inviteEmail: email,
+        }).pipe(
+          tapResponse(
+            // No action necessary with response
+            (response) => console.log(response),
+            (err) => console.error(err)
+          )
+        );
+      })
+    );
+  });
 
   getEmail() {
     return this.get(({ clientState }) => clientState?.email);
@@ -369,6 +345,18 @@ export class ChatService extends ComponentStore<ChatState> {
       body,
       this.requestOptions()
     );
+  }
+
+  private requestOptions() {
+    return this.get(({ clientState }) => {
+      return {
+        headers: new HttpHeaders({
+          Token: clientState!.token,
+          userId: clientState!.userId,
+          userEmail: clientState!.email,
+        }),
+      };
+    });
   }
 }
 

@@ -29,7 +29,7 @@ export class AppComponent {
       .pipe(filter((email) => !!email))
       .subscribe((result) => {
         console.log('Email address:', result);
-        this.chatService.createConversation(result);
+        this.chatService.createChat(result);
       });
   }
 
