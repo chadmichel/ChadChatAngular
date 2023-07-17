@@ -9,9 +9,7 @@ import { AzureCommunicationTokenCredential } from '@azure/communication-common';
 import {
   EMPTY,
   Observable,
-  combineLatest,
   combineLatestWith,
-  concatWith,
   exhaustMap,
   filter,
   from,
@@ -19,8 +17,8 @@ import {
   of,
   reduce,
   switchMap,
+  take,
   tap,
-  withLatestFrom,
 } from 'rxjs';
 import { Chat } from './dtos/conversation';
 import { ChatDetail } from './dtos/conversation-detail';
@@ -32,7 +30,9 @@ import { StorageService } from './storage.service';
   providedIn: 'root',
 })
 export class ChatService extends ComponentStore<ChatState> {
-  private readonly maxMessages: number = 100;
+  private static readonly initialState: ChatState = { chatDetails: {} };
+
+  private readonly maxMessageCount: number = 100;
 
   public readonly chats$ = this.select(({ chats }) => chats).pipe(
     filter((chats) => chats !== undefined),
@@ -52,7 +52,7 @@ export class ChatService extends ComponentStore<ChatState> {
     private readonly http: HttpClient,
     private readonly storageService: StorageService
   ) {
-    super({ chatDetails: {} });
+    super({ ...ChatService.initialState });
 
     const email = this.storageService.getCache('email');
 
@@ -91,6 +91,8 @@ export class ChatService extends ComponentStore<ChatState> {
         this.storageService.clearCache('chatClientState');
         this.chatClient?.stopRealtimeNotifications();
         this.chatClient = undefined;
+
+        this.setState({ ...ChatService.initialState });
       })
     )
   );
@@ -180,7 +182,7 @@ export class ChatService extends ComponentStore<ChatState> {
   public readonly loadChatDetails = this.effect(
     (conversationId$: Observable<string>) => {
       return conversationId$.pipe(
-        // Wait for chats before initializing chat details
+        // Wait for chats to load before loading chat details
         combineLatestWith(this.chats$),
         tap(([conversationId]) =>
           console.log('initializing chat details for ' + conversationId)
@@ -190,33 +192,25 @@ export class ChatService extends ComponentStore<ChatState> {
             (state) => state.chatDetails[conversationId]
           );
 
-          // this chat was already initialized
+          // This chat was already initialized
           if (details) {
             return EMPTY;
           }
 
-          // TODO userId must exist...so why do we need to bang it?
-          // should we mergeMap instead?
+          // Should be safe to assume if we got this far that we have a userId
           const userId = this.get((state) => state.clientState!.userId);
 
-          // 'listMessages' returns messages one by one, so we need to build our own array
-
-          // TODO how to we stop grabbing messages at 100? takeUntil?
-          // CM: only allow 100 messages in UI
-          // this maybe could be a larger number
-          // if (messagesParsed.length > this.maxMessages) {
-          //   messagesParsed = messagesParsed.slice(
-          //     messagesParsed.length - this.maxMessages
-          //   );
-          // }
+          // 'listMessages()' returns messages one by one
           return from(
             this.chatClient!.getChatThreadClient(conversationId).listMessages()
           ).pipe(
             filter((message) => message.content?.message !== undefined),
+            take(this.maxMessageCount),
             reduce<ChatMessage, Message[]>((acc, message) => {
               const messageParsed: Message = {
                 id: message.id,
                 text: message.content!.message!,
+                // TODO where was this coming from?
                 senderDisplayName: '', //chatDetail.theirDisplayName,
                 createdOn: message.createdOn,
                 isMine: (message.sender as any).communicationUserId === userId,
@@ -360,9 +354,10 @@ export class ChatService extends ComponentStore<ChatState> {
     return this.get(({ clientState }) => {
       return {
         headers: new HttpHeaders({
-          Token: clientState!.token,
-          userId: clientState!.userId,
-          userEmail: clientState!.email,
+          Token: clientState?.token ?? '',
+          userId: clientState?.userId ?? '',
+          userEmail:
+            clientState?.email ?? this.storageService.getCache('email'),
         }),
       };
     });
