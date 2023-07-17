@@ -18,10 +18,19 @@ export class LoginComponent {
     this.code = chatService.getCode();
   }
 
-  async login() {
+  login() {
     this.chatService.setCode(this.code);
     this.chatService.setServiceUrl(this.apiUri);
-    await this.chatService.login(this.email);
-    this.router.navigate(['/chats']);
+    this.chatService.login(this.email);
+
+    // TODO login was previously awaited but now it's not async
+    // so is there something in the service we should subscribe on?
+    this.chatService.isReady$.subscribe((ready) => {
+      if (ready) {
+        this.router.navigate(['/chats']);
+      } else {
+        console.log('LoginComponent: isnot ready');
+      }
+    });
   }
 }

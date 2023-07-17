@@ -6,3 +6,8 @@ export interface Message {
   createdOn: Date;
   sequenceId: number;
 }
+
+export interface NewMessage {
+  conversationId: string;
+  text: string;
+}

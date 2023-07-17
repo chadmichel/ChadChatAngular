@@ -1,7 +1,7 @@
 import { ChatUser } from './chat-user';
 import { Message } from './message';
 
-export interface ConversationDetail {
+export interface ChatDetail {
   conversationId: string;
   topic: string;
   members: ChatUser[];
