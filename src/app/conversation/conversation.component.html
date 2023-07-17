@@ -1,33 +1,6 @@
-<!-- <div class="chat-container">
-  <div class="chat-messages">
-    <div
-      *ngFor="let message of messages"
-      [ngClass]="{ received: message.isReceived }"
-    >
-      <div class="message-content">
-        <p>{{ message.text }}</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="chat-input">
-    <mat-form-field class="message-input">
-      <input
-        matInput
-        name="newMessage"
-        [(ngModel)]="newMessage"
-        placeholder="Message"
-      />
-    </mat-form-field>
-    <button mat-icon-button (click)="sendMessage()">
-      <mat-icon>send</mat-icon>
-    </button>
-  </div>
-</div> -->
-
 <div #chatmessages class="chat-messages">
   <mat-card
-    *ngFor="let message of chatDetail.value.messages"
+    *ngFor="let message of messages$ | async"
     [ngClass]="{
       'chat-message-mine': message.isMine,
       'chat-message-theirs': !message.isMine

@@ -1,267 +1,310 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { ChatClient, ChatMessage } from '@azure/communication-chat';
+import {
+  ChatClient,
+  ChatMessage,
+  ChatMessageReceivedEvent,
+} from '@azure/communication-chat';
 import { AzureCommunicationTokenCredential } from '@azure/communication-common';
-import { BehaviorSubject, Observable, firstValueFrom, of } from 'rxjs';
-import { Conversation } from './dtos/conversation';
-import { Message } from './dtos/message';
-import { ConversationDetail } from './dtos/conversation-detail';
+import {
+  EMPTY,
+  Observable,
+  combineLatestWith,
+  exhaustMap,
+  filter,
+  from,
+  map,
+  of,
+  reduce,
+  switchMap,
+  take,
+  tap,
+} from 'rxjs';
+import { Chat } from './dtos/conversation';
+import { ChatDetail } from './dtos/conversation-detail';
+import { ComponentStore, tapResponse } from '@ngrx/component-store';
+import { Message, NewMessage } from './dtos/message';
+import { StorageService } from './storage.service';
 
 @Injectable({
   providedIn: 'root',
 })
-export class ChatService {
-  maxMessages: number = 100;
-  token: string = '';
-  chatEndpoint: string = '';
-  email: string = '';
-  userId: string = '';
-  tokenExpiresOn: Date | undefined;
+export class ChatService extends ComponentStore<ChatState> {
+  private static readonly initialState: ChatState = { chatDetails: {} };
 
-  chatClient: ChatClient | undefined;
+  private readonly maxMessageCount: number = 100;
 
-  chats$: BehaviorSubject<Conversation[]> = new BehaviorSubject<Conversation[]>(
-    []
+  public readonly chats$ = this.select(({ chats }) => chats).pipe(
+    filter((chats) => chats !== undefined),
+    map((chats) => chats!)
   );
 
-  chatDetails$ = new Map<string, BehaviorSubject<ConversationDetail>>();
+  public readonly chatDetails$ = this.select(({ chatDetails }) => chatDetails);
 
-  constructor(private http: HttpClient) {
-    this.loadFromLocalStorage();
+  private chatClient: ChatClient | undefined;
 
-    if (this.tokenExpiresOn && this.tokenExpiresOn > new Date()) {
-      this.createClient();
+  public readonly isReady$ = this.select(
+    ({ clientState }) =>
+      clientState && new Date(clientState.expiresOn) > new Date()
+  );
+
+  constructor(
+    private readonly http: HttpClient,
+    private readonly storageService: StorageService
+  ) {
+    super({ ...ChatService.initialState });
+
+    const email = this.storageService.getCache('email');
+
+    if (email) {
+      this.login(email);
     }
   }
 
-  private createClient() {
-    const tokenCredential = new AzureCommunicationTokenCredential(this.token);
-    if (this.chatClient) {
-      this.chatClient?.stopRealtimeNotifications();
-    }
-    this.chatClient = new ChatClient(this.chatEndpoint, tokenCredential);
+  public readonly login = this.effect((email$: Observable<string>) => {
+    return email$.pipe(
+      switchMap((email) => {
+        const cachedState = this.storageService.getCache('chatClientState');
 
-    this.reloadConversations();
+        const clientState$ =
+          cachedState && new Date(cachedState.expiresOn) > new Date()
+            ? of(cachedState)
+            : this.httpPost<ClientState>('Init', { email: email });
 
+        return clientState$.pipe(
+          tapResponse(
+            (clientState) => {
+              this.storageService.cache('chatClientState', clientState);
+              this.patchState({ clientState });
+              this.createClient(clientState.endpoint, clientState.token);
+            },
+            (err) => console.error(err)
+          )
+        );
+      })
+    );
+  });
+
+  public readonly logout = this.effect<void>(($) =>
+    $.pipe(
+      tap(() => {
+        this.storageService.clearCache('chatClientState');
+        this.chatClient?.stopRealtimeNotifications();
+        this.chatClient = undefined;
+
+        this.setState({ ...ChatService.initialState });
+      })
+    )
+  );
+
+  private createClient(endpoint: string, token: string) {
+    const tokenCredential = new AzureCommunicationTokenCredential(token);
+
+    this.chatClient = new ChatClient(endpoint, tokenCredential);
     this.chatClient.startRealtimeNotifications();
-    this.chatClient.on('chatMessageReceived', (e) => {
-      console.log('notification: ' + JSON.stringify(e));
+    this.chatClient.on('chatMessageReceived', (e) => this.addMessage(e));
+    this.chatClient.on('chatThreadCreated', () => this.reloadChats());
 
-      const chatDetail = this.chatDetails$.get(e.threadId);
-      if (chatDetail) {
-        var senderId = (e.sender as any).communicationUserId;
-        const mine = senderId == this.userId;
-        var message: Message = {
-          id: e.id,
-          text: e.message,
-          senderDisplayName: e.senderDisplayName,
-          createdOn: new Date(e.createdOn),
-          isMine: mine,
-          sequenceId: 1000, // we don't get sequence from event :(
-        };
-        chatDetail.value.messages.push(message);
-        chatDetail.next(chatDetail.value);
-      } else {
-        console.log('chatDetail not found for ' + e.threadId);
+    this.reloadChats();
+  }
+
+  private readonly addMessage = this.updater(
+    (state, event: ChatMessageReceivedEvent) => {
+      const chat = state.chats![event.threadId];
+      const chatDetail = state.chatDetails[event.threadId];
+
+      // TODO what does it mean if these are null? how did we get here?
+      // TODO previously 'chat' was not checked for null...meaning...?
+      if (!chatDetail) {
+        console.log('chatDetail not found for ' + event.threadId);
+        return state;
+      } else if (!chat) {
+        console.log('chat not found for ' + event.threadId);
+        return state;
       }
 
-      var chat = this.chats$.value.find((c) => c.conversationId == e.threadId);
-      if (chat) {
-        chat.lastMessageTime = new Date(e.createdOn);
-        chat.lastMessage = e.message;
-        this.chats$.next(this.chats$.value);
-      }
-    });
+      // is it possible for clientState to be null? throw error?
+      const senderId = (event.sender as any).communicationUserId;
+      const isMine = senderId == state.clientState?.userId;
 
-    this.chatClient.on('chatThreadCreated', (e) => {
-      this.reloadConversations();
-    });
-  }
+      chatDetail.messages = [
+        {
+          id: event.id,
+          text: event.message,
+          senderDisplayName: event.senderDisplayName,
+          createdOn: event.createdOn,
+          isMine,
+          // TODO what does this mean? just give it a high number to put it at the end?
+          sequenceId: 1000, // CM: we don't get sequence from event :(
+        },
+        ...chatDetail.messages,
+      ];
 
-  private reloadConversations() {
-    this.httpGet<Conversation[]>('GetConversations').subscribe((chats) => {
-      console.log('chats: ' + chats.length);
-      this.chats$.next(chats);
-    });
-  }
+      chat.lastMessageTime = event.createdOn;
+      chat.lastMessage = event.message;
 
-  async login(email: string) {
-    this.chatDetails$.clear();
-    var initResponse = (await firstValueFrom(
-      this.httpPost('Init', { email: email })
-    )) as any;
-    console.log(initResponse);
-    this.token = initResponse.token;
-    this.chatEndpoint = initResponse.endpoint;
-    this.email = initResponse.email;
-    this.userId = initResponse.userId;
-    this.tokenExpiresOn = new Date(initResponse.expiresOn);
+      console.log('new chat message added');
 
-    this.createClient();
-
-    this.saveToLocalStorage();
-  }
-
-  getChats(): Observable<Conversation[]> {
-    return this.chats$;
-  }
-
-  getChat(chatId: string): BehaviorSubject<ConversationDetail> {
-    // if we already have the chat detail, return it
-    let chatDetail$ = this.chatDetails$.get(chatId);
-
-    if (chatDetail$ && chatDetail$.value.conversationId == chatId) {
-      return chatDetail$;
+      return {
+        ...state,
+        chatDetails: {
+          ...state.chatDetails,
+          [event.threadId]: chatDetail,
+        },
+      };
     }
+  );
 
-    // clear the chat detail
-    let chatDetail = {
-      conversationId: chatId,
-      topic: '',
-      members: [],
-      lastMessageTime: new Date(),
-      theirDisplayName: '',
-      messages: [],
-    } as ConversationDetail;
-    chatDetail$ = new BehaviorSubject<ConversationDetail>(chatDetail);
-    chatDetail$.next(chatDetail);
-    this.chatDetails$.set(chatId, chatDetail$);
+  private readonly reloadChats = this.effect<void>(($) =>
+    $.pipe(
+      exhaustMap(() =>
+        this.httpGet<Chat[]>('GetConversations').pipe(
+          tapResponse(
+            (chats) => this.setChats(chats),
+            (err) => console.error(err)
+          )
+        )
+      )
+    )
+  );
 
-    // populate the chat detail using cached list of chats
-    this.chats$.subscribe((chats) => {
-      var chat = chats.find((c) => c.conversationId == chatId);
-      if (chat && chatDetail.conversationId == chat.conversationId) {
-        chatDetail.topic = chat.topic;
-        chatDetail.members = chat.members;
-        chatDetail.lastMessageTime = chat.lastMessageTime;
-        if (chat.createdByUserId == this.userId) {
-          chatDetail.theirDisplayName = chat.invitedUserEmail;
-        } else {
-          chatDetail.theirDisplayName = chat.createdByEmail;
-        }
-      }
-      chatDetail$?.next(chatDetail);
-    });
+  private readonly setChats = this.updater(
+    (state, chats: Chat[]): ChatState => {
+      const chatsDict = chats.reduce((acc, chat) => {
+        acc[chat.conversationId] = chat;
+        return acc;
+      }, {} as { [id: string]: Chat });
 
-    // async load the messages
-    setTimeout(async () => {
-      const messages = this.chatClient
-        ?.getChatThreadClient(chatId)
-        .listMessages();
+      return { ...state, chats: chatsDict };
+    }
+  );
 
-      var messagesParsed: Message[] | PromiseLike<Message[]> = [];
-
-      if (messages) {
-        for await (const message of messages) {
-          console.log(message.id + ' ' + message.content);
-          if (
-            message.content?.message === undefined ||
-            message.content === undefined
-          ) {
-            continue;
-          }
-          messagesParsed.push({
-            id: message.id,
-            text: message.content?.message as string,
-            senderDisplayName: chatDetail.theirDisplayName,
-            createdOn: message.createdOn,
-            isMine: (message.sender as any).communicationUserId === this.userId,
-            sequenceId: parseInt(message.sequenceId),
-          });
-
-          messagesParsed = messagesParsed.sort(
-            (a, b) => a.sequenceId - b.sequenceId
+  public readonly loadChatDetails = this.effect(
+    (conversationId$: Observable<string>) => {
+      return conversationId$.pipe(
+        // Wait for chats to load before loading chat details
+        combineLatestWith(this.chats$),
+        tap(([conversationId]) =>
+          console.log('initializing chat details for ' + conversationId)
+        ),
+        switchMap(([conversationId, chats]) => {
+          const details = this.get(
+            (state) => state.chatDetails[conversationId]
           );
 
-          // only allow 100 messages in UI
-          // this maybe could be a larger number
-          if (messagesParsed.length > this.maxMessages) {
-            messagesParsed = messagesParsed.slice(
-              messagesParsed.length - this.maxMessages
-            );
+          // This chat was already initialized
+          if (details) {
+            return EMPTY;
           }
-        }
-      }
-      if (chatDetail.conversationId == chatId) {
-        chatDetail.messages = messagesParsed;
-        chatDetail$?.next(chatDetail);
-      }
-    }, 1);
 
-    return chatDetail$;
-  }
+          // Should be safe to assume if we got this far that we have a userId
+          const userId = this.get((state) => state.clientState!.userId);
 
-  async sendMessage(chatId: string, message: string) {
-    var result = (await firstValueFrom(
-      this.httpPost('LogMessage', {
-        threadId: chatId,
-        message: message,
-      })
-    )) as any;
-    console.log(result);
-    const chatThread = this.chatClient?.getChatThreadClient(chatId);
-    if (chatThread) {
-      const sendResult = await chatThread.sendMessage({
-        content: result.message,
-      });
-      console.log(sendResult.id);
+          // 'listMessages()' returns messages one by one
+          return from(
+            this.chatClient!.getChatThreadClient(conversationId).listMessages()
+          ).pipe(
+            filter((message) => message.content?.message !== undefined),
+            take(this.maxMessageCount),
+            reduce<ChatMessage, Message[]>((acc, message) => {
+              const messageParsed: Message = {
+                id: message.id,
+                text: message.content!.message!,
+                // TODO where was this coming from?
+                senderDisplayName: '', //chatDetail.theirDisplayName,
+                createdOn: message.createdOn,
+                isMine: (message.sender as any).communicationUserId === userId,
+                sequenceId: parseInt(message.sequenceId),
+              };
+
+              acc.push(messageParsed);
+              return acc;
+            }, []),
+            map((messages) =>
+              messages.sort((a, b) => b.sequenceId - a.sequenceId)
+            ),
+            map((messages): ChatDetail => {
+              const chat = chats[conversationId];
+
+              return {
+                conversationId: conversationId,
+                messages,
+                topic: chat.topic ?? '',
+                members: chat.members ?? [],
+                lastMessageTime: chat.lastMessageTime ?? new Date(),
+                theirDisplayName:
+                  chat.createdByUserId === userId
+                    ? chat.invitedUserEmail ?? ''
+                    : chat.createdByEmail ?? '',
+              };
+            }),
+            tapResponse(
+              (detail) => this.addChatDetail(detail),
+              (error) => console.error(error)
+            )
+          );
+        })
+      );
     }
-  }
+  );
 
-  async createConversation(email: string) {
-    var response = (await firstValueFrom(
-      this.httpPost('CreateConversation', {
-        inviteEmail: email,
+  private readonly addChatDetail = this.updater(
+    (state, chatDetail: ChatDetail) => {
+      console.log('adding chat detail for ' + chatDetail.conversationId);
+
+      return {
+        ...state,
+        chatDetails: {
+          ...state.chatDetails,
+          [chatDetail.conversationId]: chatDetail,
+        },
+      };
+    }
+  );
+
+  public readonly sendMessage = this.effect(
+    (message$: Observable<NewMessage>) => {
+      return message$.pipe(
+        switchMap((message) =>
+          this.httpPost('LogMessage', {
+            threadId: message.conversationId,
+            message: message.text,
+          }).pipe(map((result: any) => ({ message, result })))
+        ),
+        switchMap(({ message, result }) => {
+          return from(
+            this.chatClient!.getChatThreadClient(
+              message.conversationId
+            ).sendMessage({
+              content: result.message,
+            })
+          ).pipe(
+            tapResponse(
+              // No action necessary with response
+              (response) => console.log('Message sent :' + response.id),
+              (err) => console.error(err)
+            )
+          );
+        })
+      );
+    }
+  );
+
+  public readonly createChat = this.effect((email$: Observable<string>) => {
+    return email$.pipe(
+      switchMap((email) => {
+        return this.httpPost('CreateConversation', {
+          inviteEmail: email,
+        }).pipe(
+          tapResponse(
+            // No action necessary with response
+            (response) => console.log(response),
+            (err) => console.error(err)
+          )
+        );
       })
-    )) as any;
-    console.log(response);
-  }
-
-  isReady() {
-    return (
-      this.chatClient != undefined &&
-      this.token != '' &&
-      this.token != undefined &&
-      this.tokenExpiresOn != undefined &&
-      this.tokenExpiresOn! > new Date()
     );
-  }
-
-  saveToLocalStorage() {
-    localStorage.setItem(
-      'chatService',
-      JSON.stringify({
-        token: this.token,
-        chatEndpoint: this.chatEndpoint,
-        email: this.email,
-        userId: this.userId,
-        tokenExpiresOn: this.tokenExpiresOn,
-      })
-    );
-  }
-
-  loadFromLocalStorage() {
-    let data = JSON.parse(localStorage.getItem('chatService') || '{}');
-    this.token = data.token;
-    this.chatEndpoint = data.chatEndpoint;
-    this.email = data.email;
-    this.userId = data.userId;
-    this.tokenExpiresOn = new Date(data.tokenExpiresOn);
-  }
-
-  private requestOptions() {
-    return {
-      headers: new HttpHeaders({
-        Token: this.token ?? '',
-        userId: this.userId ?? '',
-        userEmail: this.email ?? '',
-      }),
-    };
-  }
-
-  getEmail() {
-    return this.email;
-  }
+  });
 
   // Code for calling Azure Function API
   private code = '';
@@ -283,7 +326,7 @@ export class ChatService {
       this.serviceUrl = localStorage.getItem('serviceUrl') ?? '';
     }
     if (this.serviceUrl == undefined || this.serviceUrl == '') {
-      this.serviceUrl = 'https://localhost:7071'; // default for local dev
+      this.serviceUrl = 'https://localhost:7072'; // default for local dev
     }
     return this.serviceUrl;
   }
@@ -306,4 +349,55 @@ export class ChatService {
       this.requestOptions()
     );
   }
+
+  private requestOptions() {
+    return this.get(({ clientState }) => {
+      return {
+        headers: new HttpHeaders({
+          Token: clientState?.token ?? '',
+          userId: clientState?.userId ?? '',
+          userEmail:
+            clientState?.email ?? this.storageService.getCache('email'),
+        }),
+      };
+    });
+  }
 }
+
+export interface ChatState {
+  chats?: Chats;
+  chatDetails: ChatDetails;
+  clientState?: ClientState;
+}
+
+export interface Chats {
+  [threadId: string]: Chat;
+}
+
+export interface ChatDetails {
+  [threadId: string]: ChatDetail;
+}
+
+export interface ClientState {
+  token: string;
+  endpoint: string;
+  email: string;
+  userId: string;
+  expiresOn: Date;
+}
+
+// TODO first get stuff working with Chad's DTOs, then refactor to these
+// export interface ChatSummary {
+//   id: string;
+//   createdAt: Date;
+//   lastMessageAt: Date; // <-- derive from chat messages if we have them?
+//   lastMessageText: string; // <-- derive from chat messages if we have them?
+//   participants: ParticipantSummary[];
+// }
+
+// export interface ParticipantSummary {
+//   id: string;
+//   name: string;
+//   accountType: 'Student' | 'Teacher';
+//   profilePictureUrl: string;
+// }

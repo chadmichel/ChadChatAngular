@@ -2,8 +2,8 @@ import { Component } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ChatService } from '../chat.service';
 import { Router } from '@angular/router';
-import { Observable, of } from 'rxjs';
-import { Conversation } from '../dtos/conversation';
+import { Observable, map, tap } from 'rxjs';
+import { Chat } from '../dtos/conversation';
 
 @Component({
   selector: 'app-conversation-list',
@@ -11,31 +11,30 @@ import { Conversation } from '../dtos/conversation';
   styleUrls: ['./conversation-list.component.scss'],
 })
 export class ConversationListComponent {
-  chats$: Observable<Conversation[]> = of([]);
-  chats: Conversation[] = [];
-  isLoaded: boolean = false;
+  readonly chats$: Observable<Chat[]>;
 
   constructor(
-    private title: Title,
-    private chatService: ChatService,
-    private router: Router
+    private readonly title: Title,
+    private readonly router: Router,
+    chatService: ChatService
   ) {
     this.title.setTitle('Conversation List');
+
+    this.chats$ = chatService.chats$.pipe(
+      map((chats) => {
+        return Object.values(chats).sort(
+          (a, b) =>
+            new Date(b.lastMessageTime).getTime() -
+            new Date(a.lastMessageTime).getTime()
+        );
+      }),
+      tap((chats) => {
+        this.title.setTitle('Conversation List (' + chats.length + ')');
+      })
+    );
   }
 
-  ngOnInit() {
-    this.chats$ = this.chatService.getChats();
-    this.chats$.subscribe((chats) => {
-      console.log('loaded');
-      console.log(chats.length);
-      this.chats = chats;
-      this.isLoaded = true;
-      console.log('setting title');
-      this.title.setTitle('Conversation List (' + chats.length + ')');
-    });
-  }
-
-  openChat(chat: Conversation) {
+  openChat(chat: Chat) {
     this.router.navigate(['/chats', chat.conversationId]);
   }
 }

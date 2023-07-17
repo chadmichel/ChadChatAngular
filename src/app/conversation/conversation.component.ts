@@ -1,62 +1,50 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ChatService } from '../chat.service';
-import { ActivatedRoute, Router } from '@angular/router';
-import { BehaviorSubject } from 'rxjs';
-import { ConversationDetail } from '../dtos/conversation-detail';
+import { ActivatedRoute } from '@angular/router';
+import { Observable, filter, map } from 'rxjs';
+import { Message } from '../dtos/message';
 
 @Component({
   selector: 'app-conversation',
   templateUrl: './conversation.component.html',
   styleUrls: ['./conversation.component.scss'],
 })
-export class ConversationComponent {
-  newMessage: string = '';
-  id: string = '';
+export class ConversationComponent implements OnInit {
+  public newMessage: string = '';
+  private conversationId!: string;
 
-  chatDetail: BehaviorSubject<ConversationDetail> =
-    new BehaviorSubject<ConversationDetail>({
-      conversationId: '',
-      topic: '',
-      members: [],
-      lastMessageTime: new Date(),
-      theirDisplayName: '',
-      messages: [],
-    });
+  public messages$!: Observable<Message[]>;
 
   constructor(
-    private title: Title,
-    private chatService: ChatService,
-    private router: Router,
-    private activeRoute: ActivatedRoute
+    private readonly title: Title,
+    private readonly chatService: ChatService,
+    private readonly activeRoute: ActivatedRoute
   ) {
     this.title.setTitle('Conversation');
   }
 
-  async ngOnInit() {
-    this.activeRoute.params.subscribe(async (params) => {
-      this.id = params['id'];
-      this.chatDetail = await this.chatService.getChat(this.id);
-      this.chatDetail.subscribe((chat) => {
-        this.title.setTitle('Chat with ' + chat.theirDisplayName);
-        this.scrollToBottom();
-      });
+  ngOnInit() {
+    this.conversationId = this.activeRoute.snapshot.params['id'];
 
-      this.scrollToBottom();
+    this.messages$ = this.chatService.chatDetails$.pipe(
+      filter((chatDetails) => chatDetails[this.conversationId] !== undefined),
+      map((chatDetails) => chatDetails[this.conversationId].messages)
+    );
+
+    this.chatService.loadChatDetails(this.conversationId);
+  }
+
+  public sendMessage() {
+    if (!this.newMessage.trim().length) {
+      return;
+    }
+
+    this.chatService.sendMessage({
+      conversationId: this.conversationId,
+      text: this.newMessage,
     });
-  }
 
-  async sendMessage() {
-    if (this.newMessage.length > 0) {
-      this.chatService.sendMessage(this.id, this.newMessage);
-      this.newMessage = '';
-    }
-  }
-
-  scrollToBottom() {
-    var element = document.getElementById('chatmessages');
-    if (element) {
-      element.scrollTop = element.scrollHeight;
-    }
+    this.newMessage = '';
   }
 }

@@ -34,7 +34,15 @@
   </mat-form-field>
 
   <div>
-    <button mat-raised-button color="primary" type="submit" (click)="login()">
+    <button
+      mat-raised-button
+      color="secondary"
+      type="button"
+      (click)="logout()"
+    >
+      Logout
+    </button>
+    <button mat-raised-button color="primary" type="button" (click)="login()">
       Login
     </button>
   </div>
